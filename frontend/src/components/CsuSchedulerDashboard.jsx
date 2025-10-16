@@ -1,12 +1,51 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import Papa from "papaparse";
 
-const C = { green: "#006747", dark: "#004c35", light: "#e6f2ee", accent: "#7fbf9f" };
+/**
+ * CSU-inspired theme (Cleveland State University)
+ * Colors sourced from their typical brand palette:
+ * - Viking Green (primary): #006747
+ * - Dark Green (headers):   #004C35
+ * - Light Tint              #E6F2EE
+ * - Accent                  #7FBF9F
+ */
+const THEME = {
+  green: "#006747",
+  dark: "#004C35",
+  light: "#E6F2EE",
+  accent: "#7FBF9F",
+  grayText: "#4B5563",
+  grayBorder: "#E5E7EB",
+  cardShadow: "0 6px 20px rgba(0,0,0,0.08)",
+  cardShadowHover: "0 10px 28px rgba(0,0,0,0.12)"
+};
+
 const COURSE_COLS = ["Course", "Section", "Days", "StartTime", "EndTime", "Room"];
 const STAFF_COLS  = ["Name", "Email", "Role", "Availability", "PreferredPartners"];
 
 export default function CsuSchedulerDashboard() {
+  // Inject a close-enough font stack to CSU’s site (system sans + Merriweather for headings)
+  useEffect(() => {
+    const link1 = document.createElement("link");
+    link1.rel = "preconnect";
+    link1.href = "https://fonts.googleapis.com";
+    const link2 = document.createElement("link");
+    link2.rel = "preconnect";
+    link2.href = "https://fonts.gstatic.com";
+    link2.crossOrigin = "anonymous";
+    const link3 = document.createElement("link");
+    link3.href =
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700;900&display=swap";
+    link3.rel = "stylesheet";
+    document.head.append(link1, link2, link3);
+    return () => {
+      link1.remove();
+      link2.remove();
+      link3.remove();
+    };
+  }, []);
+
   const [courseFile, setCourseFile] = useState(null);
   const [staffFile,  setStaffFile]  = useState(null);
   const [courseRows, setCourseRows] = useState([]);
@@ -14,7 +53,6 @@ export default function CsuSchedulerDashboard() {
   const [toast,      setToast]      = useState("");
   const [error,      setError]      = useState("");
 
-  // progress = 0/50/100 based on files present
   const progress = (courseFile ? 50 : 0) + (staffFile ? 50 : 0);
 
   async function parseCsv(file) {
@@ -38,34 +76,61 @@ export default function CsuSchedulerDashboard() {
   const handleFile = async (file, type) => {
     setError("");
     const ext = (file.name.split(".").pop() || "").toLowerCase();
-    if (ext !== "csv") { setError("Please upload a .csv file (use the template)."); return; }
+    if (ext !== "csv") {
+      setError("Please upload a .csv file (use the provided template).");
+      return;
+    }
     const rows = await parseCsv(file);
     if (type === "course") { setCourseFile(file); setCourseRows(rows); }
     else { setStaffFile(file); setStaffRows(rows); }
   };
 
   const onDrop = async (e, type) => {
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault();
     const f = e.dataTransfer?.files?.[0];
     if (f) await handleFile(f, type);
   };
-  const onDrag = (e) => { e.preventDefault(); e.stopPropagation(); };
 
-  const ready = progress === 100 && courseMissing.length === 0 && staffMissing.length === 0;
+  const ready =
+    progress === 100 &&
+    courseMissing.length === 0 &&
+    staffMissing.length === 0;
 
   const renderPreview = (rows) => {
-    if (!rows.length) return <p className="text-gray-500 text-sm">No preview yet</p>;
-    const headers = Array.from(new Set(rows.slice(0, 5).flatMap(r => Object.keys(r))));
+    if (!rows.length) {
+      return <p style={{color:"#6B7280", fontSize:12, textAlign:"center", marginTop:10}}>No preview yet</p>;
+    }
+    const headers = Array.from(new Set(rows.slice(0,5).flatMap(r => Object.keys(r))));
     return (
-      <div className="overflow-auto border rounded-xl mt-3">
-        <table className="min-w-full text-sm">
+      <div style={{
+        overflow: "auto",
+        border: `1px solid ${THEME.grayBorder}`,
+        borderRadius: 12,
+        marginTop: 12
+      }}>
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:14 }}>
           <thead>
-            <tr>{headers.map(h => <th key={h} className="text-left p-2 border-b bg-gray-50 font-semibold">{h}</th>)}</tr>
+            <tr>
+              {headers.map(h => (
+                <th key={h} style={{
+                  textAlign:"left",
+                  padding:"10px 12px",
+                  borderBottom:`1px solid ${THEME.grayBorder}`,
+                  background:"#F9FAFB",
+                  fontWeight:600
+                }}>{h}</th>
+              ))}
+            </tr>
           </thead>
           <tbody>
-            {rows.slice(0,5).map((r,i) => (
-              <tr key={i} className="odd:bg-white even:bg-gray-50/40">
-                {headers.map(h => <td key={h} className="p-2 border-b">{r[h] ?? ""}</td>)}
+            {rows.slice(0,5).map((r, i) => (
+              <tr key={i} style={{ background: i%2 ? "rgba(0,0,0,0.02)" : "white" }}>
+                {headers.map(h => (
+                  <td key={h} style={{
+                    padding:"10px 12px",
+                    borderBottom:`1px solid ${THEME.grayBorder}`
+                  }}>{r[h] ?? ""}</td>
+                ))}
               </tr>
             ))}
           </tbody>
@@ -74,59 +139,113 @@ export default function CsuSchedulerDashboard() {
     );
   };
 
-  const Card = ({title, file, rows, expect, onPick, onDropFile, templateName}) => (
-    <motion.div
-      className="bg-white rounded-3xl p-6 shadow border border-gray-100 h-full"
-      whileHover={{ scale: 1.005 }}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xl font-semibold" style={{ color: C.dark }}>{title}</h2>
-        <span className="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700">CSV only</span>
-      </div>
+  const UploadCard = ({ title, file, rows, expect, onPick, onDropFile, templateName }) => {
+    const card = {
+      background: "#fff",
+      border: `1px solid ${THEME.grayBorder}`,
+      borderRadius: 20,
+      padding: 24,
+      boxShadow: THEME.cardShadow,
+      transition: "box-shadow .25s ease, transform .25s ease",
+    };
 
-      <label
-        onDragEnter={onDrag} onDragOver={onDrag} onDrop={onDropFile}
-        className="block border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center cursor-pointer hover:bg-[#f2fbf7] transition"
+    const label = {
+      border: `1px dashed ${THEME.grayBorder}`,
+      borderRadius: 16,
+      padding: 28,
+      textAlign: "center",
+      background: "#F7FAF7",
+      cursor: "pointer",
+      transition: "background .2s ease"
+    };
+
+    return (
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        style={card}
+        onMouseEnter={e => (e.currentTarget.style.boxShadow = THEME.cardShadowHover)}
+        onMouseLeave={e => (e.currentTarget.style.boxShadow = THEME.cardShadow)}
       >
-        <input type="file" accept=".csv" className="hidden"
-               onChange={(e) => e.target.files[0] && onPick(e.target.files[0])}/>
-        {!file ? (
-          <>
-            <div className="mx-auto mb-3 w-12 h-12 rounded-xl grid place-items-center" style={{ background: C.light, color: C.green }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19 20H5a2 2 0 0 1-2-2V8l4-4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2ZM5 8h14M9 3v5"/></svg>
-            </div>
-            <p className="text-gray-700">Drag & drop or click to upload</p>
-            <p className="text-xs text-gray-500 mt-1">Use the template below</p>
-          </>
-        ) : (
-          <>
-            <p className="font-medium" style={{ color: C.green }}>{file.name}</p>
-            <div className="mt-2 text-xs text-gray-600 flex gap-3">
-              <span className="px-2 py-0.5 rounded-md bg-gray-100 border">Rows: <b>{rows.length}</b></span>
-              <span className="px-2 py-0.5 rounded-md bg-gray-100 border">Cols: <b>{rows.length ? Object.keys(rows[0] || {}).length : 0}</b></span>
-            </div>
-            {renderPreview(rows)}
-          </>
-        )}
-      </label>
+        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8}}>
+          <h2 style={{fontFamily:"Merriweather, serif", fontSize:20, color:THEME.dark, margin:0}}>
+            {title}
+          </h2>
+          <span style={{
+            fontSize:11, padding:"4px 8px", border:`1px solid ${THEME.grayBorder}`,
+            borderRadius:6, background:"#F3F4F6", color:"#374151"
+          }}>CSV</span>
+        </div>
 
-      <p className="text-xs text-gray-600 mt-3">
-        Expected columns: <span className="font-medium">{expect.join(", ")}</span>
-      </p>
+        <label
+          onDragEnter={e => e.preventDefault()}
+          onDragOver={e => e.preventDefault()}
+          onDrop={onDropFile}
+          style={label}
+          onMouseEnter={e => (e.currentTarget.style.background = "#EEF7F1")}
+          onMouseLeave={e => (e.currentTarget.style.background = "#F7FAF7")}
+        >
+          <input
+            type="file"
+            accept=".csv"
+            style={{ display:"none" }}
+            onChange={(e) => e.target.files[0] && onPick(e.target.files[0])}
+          />
+          {!file ? (
+            <>
+              <div style={{
+                width:44, height:44, margin:"0 auto 8px",
+                borderRadius:10, display:"grid", placeItems:"center",
+                background: THEME.light, color: THEME.green
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 20H5a2 2 0 0 1-2-2V8l4-4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2ZM5 8h14M9 3v5" />
+                </svg>
+              </div>
+              <div style={{color:"#111827", fontWeight:600}}>Drag & drop or click to upload</div>
+              <div style={{fontSize:12, color:"#6B7280", marginTop:4}}>Use the template below</div>
+            </>
+          ) : (
+            <>
+              <div style={{color:THEME.green, fontWeight:600}}>{file.name}</div>
+              <div style={{marginTop:8, display:"flex", gap:8, justifyContent:"center", fontSize:12, color:"#6B7280"}}>
+                <span style={{background:"#F3F4F6", border:"1px solid #E5E7EB", borderRadius:6, padding:"2px 8px"}}>
+                  Rows: <b>{rows.length}</b>
+                </span>
+                <span style={{background:"#F3F4F6", border:"1px solid #E5E7EB", borderRadius:6, padding:"2px 8px"}}>
+                  Cols: <b>{rows.length ? Object.keys(rows[0] || {}).length : 0}</b>
+                </span>
+              </div>
+              {renderPreview(rows)}
+            </>
+          )}
+        </label>
 
-      <a
-        href={URL.createObjectURL(new Blob([expect.join(",") + "\n"], { type: "text/csv" }))}
-        download={templateName}
-        className="inline-flex items-center gap-2 mt-3 px-3 py-2 rounded-xl border text-[13px] hover:bg-[#e6f2ee]"
-        style={{ color: C.dark }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" className="opacity-80" fill="currentColor">
-          <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        Download Template
-      </a>
-    </motion.div>
-  );
+        <p style={{fontSize:12, color:"#6B7280", marginTop:12}}>
+          Expected columns: <span style={{fontWeight:600, color:"#374151"}}>{expect.join(", ")}</span>
+        </p>
+
+        <div style={{display:"flex", justifyContent:"center"}}>
+          <a
+            href={URL.createObjectURL(new Blob([expect.join(",") + "\n"], { type: "text/csv" }))}
+            download={templateName}
+            style={{
+              display:"inline-flex", alignItems:"center", gap:8,
+              padding:"8px 12px", border:`1px solid ${THEME.grayBorder}`,
+              borderRadius:12, fontSize:13, color:THEME.dark,
+              background:"#FFFFFF", textDecoration:"none"
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = THEME.light)}
+            onMouseLeave={e => (e.currentTarget.style.background = "#FFFFFF")}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{opacity:.8}}>
+              <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Download Template
+          </a>
+        </div>
+      </motion.div>
+    );
+  };
 
   const uploadRosters = async () => {
     if (!ready) return;
@@ -145,88 +264,139 @@ export default function CsuSchedulerDashboard() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: `linear-gradient(180deg, ${C.light}, #fff)` }}>
-      {/* Top bar */}
-      <header className="w-full bg-white/90 backdrop-blur border-b">
-        <div className="w-full px-6 py-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl grid place-items-center font-bold text-white" style={{ background: C.green }}>CSU</div>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold" style={{ color: C.dark }}>Scheduler Dashboard</h1>
-            <p className="text-sm text-gray-600">Upload Course and Staff rosters to begin.</p>
+    <div style={{minHeight:"100vh", display:"flex", flexDirection:"column", background:"linear-gradient(180deg, #F6FBF8 0%, #FFFFFF 70%)"}}>
+      {/* ============== CSU MASTHEAD ============== */}
+      <style>{`
+        :root { --csu-green:${THEME.green}; --csu-dark:${THEME.dark}; }
+        .csu-masthead { background: var(--csu-green); color: #fff; }
+        .csu-subbar   { background: #0f7a59; color:#d6faea; }
+        .csu-container { width: 100%; max-width: 1120px; margin-inline: auto; padding-inline: 20px; }
+        .csu-title { font-family: Merriweather, serif; font-weight: 900; letter-spacing: .2px; }
+        .csu-body  { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+        @media (max-width: 640px){ .csu-title{ font-size: 24px !important; } }
+      `}</style>
+
+      <header className="csu-body">
+        <div className="csu-masthead">
+          <div className="csu-container" style={{display:"flex", alignItems:"center", gap:14, padding:"12px 20px"}}>
+            <div style={{
+              width:36, height:36, borderRadius:"50%", background:"#fff",
+              color:THEME.green, display:"grid", placeItems:"center", fontWeight:800
+            }}>CSU</div>
+            <div style={{lineHeight:1}}>
+              <div style={{fontSize:14, opacity:.9}}>Cleveland State University</div>
+              <div className="csu-title" style={{fontSize:28, marginTop:2}}>Scheduler Dashboard</div>
+            </div>
+          </div>
+        </div>
+        <div className="csu-subbar">
+          <div className="csu-container" style={{padding:"6px 20px", fontSize:13}}>
+            Upload Course and Staff rosters to begin.
           </div>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="flex-1 w-full px-6 py-8">
-        {/* full-width, simple two-column grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card
-            title="Course Roster"
-            file={courseFile}
-            rows={courseRows}
-            expect={COURSE_COLS}
-            onPick={(f) => handleFile(f, "course")}
-            onDropFile={(e) => onDrop(e, "course")}
-            templateName="course_roster_template.csv"
-          />
-          <Card
-            title="Staff Roster"
-            file={staffFile}
-            rows={staffRows}
-            expect={STAFF_COLS}
-            onPick={(f) => handleFile(f, "staff")}
-            onDropFile={(e) => onDrop(e, "staff")}
-            templateName="staff_roster_template.csv"
-          />
-        </div>
-
-        {error && (
-          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 text-amber-800 p-3 text-sm">
-            {error}
+      {/* ============== MAIN ============== */}
+      <main className="csu-body" style={{
+        flex:1, display:"flex", justifyContent:"center", padding:"40px 20px"
+      }}>
+        {/* Center “middle third” column */}
+        <div style={{ width:"100%", maxWidth: 980 }}>
+          {/* Cards grid */}
+          <div style={{
+            display:"grid",
+            gridTemplateColumns:"1fr 1fr",
+            gap: 24
+          }}>
+            <UploadCard
+              title="Course Roster"
+              file={courseFile}
+              rows={courseRows}
+              expect={COURSE_COLS}
+              onPick={(f) => handleFile(f, "course")}
+              onDropFile={(e) => onDrop(e, "course")}
+              templateName="course_roster_template.csv"
+            />
+            <UploadCard
+              title="Staff Roster"
+              file={staffFile}
+              rows={staffRows}
+              expect={STAFF_COLS}
+              onPick={(f) => handleFile(f, "staff")}
+              onDropFile={(e) => onDrop(e, "staff")}
+              templateName="staff_roster_template.csv"
+            />
           </div>
-        )}
+
+          {/* Errors */}
+          {error && (
+            <div style={{
+              marginTop:16, border:`1px solid #FCD34D`, background:"#FFFBEB",
+              color:"#92400E", borderRadius:14, padding:"10px 14px", fontSize:14
+            }}>
+              {error}
+            </div>
+          )}
+        </div>
       </main>
 
-      {/* Sticky bottom action bar */}
-      <div className="w-full sticky bottom-0 left-0 bg-white/95 backdrop-blur border-t px-6 py-4">
-        <div className="flex flex-col md:flex-row items-center gap-4">
-          <div className="w-full">
-            <div className="h-2 bg-gray-200 rounded-full">
+      {/* ============== STICKY FOOTER ============== */}
+      <footer className="csu-body" style={{
+        position:"sticky", bottom:0, background:"#ffffffcc", backdropFilter:"blur(6px)",
+        borderTop:`1px solid ${THEME.grayBorder}`
+      }}>
+        <div className="csu-container" style={{
+          display:"flex", alignItems:"center", gap:16, padding:"14px 20px"
+        }}>
+          <div style={{flex:1}}>
+            <div style={{height:8, background:"#E5E7EB", borderRadius:999, overflow:"hidden"}}>
               <motion.div
-                className="h-2 rounded-full"
+                initial={false}
                 animate={{ width: `${progress}%` }}
-                style={{ background: C.accent }}
+                style={{
+                  height:"100%",
+                  background:`linear-gradient(90deg, ${THEME.green}, ${THEME.accent})`
+                }}
               />
             </div>
-            <p className="text-xs text-gray-600 mt-1">
+            <div style={{fontSize:12, color:"#6B7280", marginTop:6}}>
               {progress < 100
                 ? "Upload both CSVs to continue."
                 : (courseMissing.length || staffMissing.length)
                   ? "Fix missing columns before continuing."
                   : "Ready to continue."}
-            </p>
+            </div>
           </div>
+
           <button
             onClick={uploadRosters}
             disabled={!ready}
-            className={`px-6 py-3 rounded-2xl font-semibold transition ${
-              !ready ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "text-white hover:opacity-90"
-            }`}
-            style={{ background: ready ? C.green : undefined }}
+            style={{
+              padding:"10px 18px", border:"none",
+              borderRadius:14, fontWeight:700,
+              background: ready ? THEME.green : "#D1D5DB",
+              color: ready ? "#fff" : "#6B7280",
+              cursor: ready ? "pointer" : "not-allowed",
+              transform: "translateZ(0)"
+            }}
+            onMouseDown={e => ready && (e.currentTarget.style.transform = "scale(.98)")}
+            onMouseUp={e => ready && (e.currentTarget.style.transform = "scale(1)")}
           >
             Continue →
           </button>
         </div>
-      </div>
+      </footer>
 
       {/* Toast */}
       {toast && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-3 rounded-2xl shadow-lg text-white"
-          style={{ background: C.dark }}
+          style={{
+            position:"fixed", left:"50%", bottom:24, transform:"translateX(-50%)",
+            background: THEME.dark, color:"#fff", padding:"10px 14px",
+            borderRadius:14, boxShadow:"0 10px 24px rgba(0,0,0,0.15)", fontWeight:600
+          }}
         >
           {toast}
         </motion.div>
