@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Papa from "papaparse";
 
@@ -25,7 +25,7 @@ const COURSE_COLS = ["Course", "Section", "Days", "StartTime", "EndTime", "Room"
 const STAFF_COLS  = ["Name", "Email", "Role", "Availability", "PreferredPartners"];
 
 export default function CsuSchedulerDashboard() {
-  // Inject a close-enough font stack to CSU’s site (system sans + Merriweather for headings)
+  // Inject fonts
   useEffect(() => {
     const link1 = document.createElement("link");
     link1.rel = "preconnect";
@@ -39,11 +39,7 @@ export default function CsuSchedulerDashboard() {
       "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700;900&display=swap";
     link3.rel = "stylesheet";
     document.head.append(link1, link2, link3);
-    return () => {
-      link1.remove();
-      link2.remove();
-      link3.remove();
-    };
+    return () => { link1.remove(); link2.remove(); link3.remove(); };
   }, []);
 
   const [courseFile, setCourseFile] = useState(null);
@@ -103,7 +99,6 @@ export default function CsuSchedulerDashboard() {
     const headers = Array.from(new Set(rows.slice(0,5).flatMap(r => Object.keys(r))));
     return (
       <div style={{
-        overflow: "auto",
         border: `1px solid ${THEME.grayBorder}`,
         borderRadius: 12,
         marginTop: 12
@@ -140,17 +135,20 @@ export default function CsuSchedulerDashboard() {
   };
 
   const UploadCard = ({ title, file, rows, expect, onPick, onDropFile, templateName }) => {
+    const inputRef = useRef(null);
+
     const card = {
       background: "#fff",
       border: `1px solid ${THEME.grayBorder}`,
       borderRadius: 20,
       padding: 24,
       boxShadow: THEME.cardShadow,
-      transition: "box-shadow .25s ease, transform .25s ease",
+      willChange: "box-shadow",
+      backfaceVisibility: "hidden"
     };
 
-    const label = {
-      border: `1px dashed ${THEME.grayBorder}`,
+    const pickerBox = {
+      border: `1px solid ${THEME.grayBorder}`,
       borderRadius: 16,
       padding: 28,
       textAlign: "center",
@@ -160,9 +158,8 @@ export default function CsuSchedulerDashboard() {
     };
 
     return (
-      <motion.div
-        whileHover={{ scale: 1.01 }}
-        style={card}
+      <div
+        style={{ ...card, transition: "box-shadow 0.2s ease" }}
         onMouseEnter={e => (e.currentTarget.style.boxShadow = THEME.cardShadowHover)}
         onMouseLeave={e => (e.currentTarget.style.boxShadow = THEME.cardShadow)}
       >
@@ -176,20 +173,27 @@ export default function CsuSchedulerDashboard() {
           }}>CSV</span>
         </div>
 
-        <label
-          onDragEnter={e => e.preventDefault()}
-          onDragOver={e => e.preventDefault()}
+        {/* Clickable upload area (no <label>) */}
+        <div
+          role="button"
+          tabIndex={0}
+          style={pickerBox}
+          onClick={() => inputRef.current?.click()}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
+          onDragEnter={(e) => e.preventDefault()}
+          onDragOver={(e) => e.preventDefault()}
           onDrop={onDropFile}
-          style={label}
-          onMouseEnter={e => (e.currentTarget.style.background = "#EEF7F1")}
-          onMouseLeave={e => (e.currentTarget.style.background = "#F7FAF7")}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#EEF7F1")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "#F7FAF7")}
         >
           <input
+            ref={inputRef}
             type="file"
             accept=".csv"
             style={{ display:"none" }}
             onChange={(e) => e.target.files[0] && onPick(e.target.files[0])}
           />
+
           {!file ? (
             <>
               <div style={{
@@ -218,7 +222,7 @@ export default function CsuSchedulerDashboard() {
               {renderPreview(rows)}
             </>
           )}
-        </label>
+        </div>
 
         <p style={{fontSize:12, color:"#6B7280", marginTop:12}}>
           Expected columns: <span style={{fontWeight:600, color:"#374151"}}>{expect.join(", ")}</span>
@@ -243,7 +247,7 @@ export default function CsuSchedulerDashboard() {
             Download Template
           </a>
         </div>
-      </motion.div>
+      </div>
     );
   };
 
@@ -297,17 +301,9 @@ export default function CsuSchedulerDashboard() {
       </header>
 
       {/* ============== MAIN ============== */}
-      <main className="csu-body" style={{
-        flex:1, display:"flex", justifyContent:"center", padding:"40px 20px"
-      }}>
-        {/* Center “middle third” column */}
+      <main className="csu-body" style={{ flex:1, display:"flex", justifyContent:"center", padding:"40px 20px" }}>
         <div style={{ width:"100%", maxWidth: 980 }}>
-          {/* Cards grid */}
-          <div style={{
-            display:"grid",
-            gridTemplateColumns:"1fr 1fr",
-            gap: 24
-          }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap: 24 }}>
             <UploadCard
               title="Course Roster"
               file={courseFile}
@@ -328,7 +324,6 @@ export default function CsuSchedulerDashboard() {
             />
           </div>
 
-          {/* Errors */}
           {error && (
             <div style={{
               marginTop:16, border:`1px solid #FCD34D`, background:"#FFFBEB",
@@ -345,18 +340,13 @@ export default function CsuSchedulerDashboard() {
         position:"sticky", bottom:0, background:"#ffffffcc", backdropFilter:"blur(6px)",
         borderTop:`1px solid ${THEME.grayBorder}`
       }}>
-        <div className="csu-container" style={{
-          display:"flex", alignItems:"center", gap:16, padding:"14px 20px"
-        }}>
+        <div className="csu-container" style={{ display:"flex", alignItems:"center", gap:16, padding:"14px 20px" }}>
           <div style={{flex:1}}>
             <div style={{height:8, background:"#E5E7EB", borderRadius:999, overflow:"hidden"}}>
               <motion.div
                 initial={false}
                 animate={{ width: `${progress}%` }}
-                style={{
-                  height:"100%",
-                  background:`linear-gradient(90deg, ${THEME.green}, ${THEME.accent})`
-                }}
+                style={{ height:"100%", background:`linear-gradient(90deg, ${THEME.green}, ${THEME.accent})` }}
               />
             </div>
             <div style={{fontSize:12, color:"#6B7280", marginTop:6}}>
