@@ -1,35 +1,13 @@
-<!DOCTYPE html>
+<!-- frontend/index.html -->
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>TA Scheduling Tool</title>
-</head>
-<body>
-  <h1>TA Scheduler</h1>
-  <form id="scheduleForm">
-    <label>TA Name:</label>
-    <input type="text" id="taName" required>
-    <label>Available Days:</label>
-    <input type="text" id="days" required>
-    <button type="submit">Submit</button>
-  </form>
-
-  <div id="response"></div>
-
-  <script>
-    document.getElementById('scheduleForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const taName = document.getElementById('taName').value;
-      const days = document.getElementById('days').value;
-
-      const response = await fetch('/submit', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ taName, days })
-      });
-      const result = await response.json();
-      document.getElementById('response').innerText = result.message;
-    });
-  </script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSU Scheduler</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
