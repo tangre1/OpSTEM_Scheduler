@@ -21,8 +21,31 @@ const THEME = {
   cardShadowHover: "0 10px 28px rgba(0,0,0,0.12)"
 };
 
-const COURSE_COLS = ["Course", "Section", "Days", "StartTime", "EndTime", "Room"];
-const STAFF_COLS  = ["Name", "Email", "Role", "Availability", "PreferredPartners"];
+const COURSE_COLS = [
+  "Course", 
+  "Section", 
+  "Days", 
+  "StartTime", 
+  "EndTime", 
+  "Room",
+  "Min # of SPTs Required"
+];
+
+const STAFF_COLS = [
+  "Name:",
+  "Partner Preference 1:",
+  "Partner Preference 2:",
+  "Partner Preference 3:",
+  "1st Choice",
+  "2nd Choice",
+  "9:10AM-10:00AM",
+  "10:15AM-11:05AM",
+  "11:20AM-12:10PM",
+  "12:25PM-1:15PM",
+  "1:30PM-2:20PM",
+  "2:35PM-3:25PM",
+  "Veteran?"
+];
 
 export default function CsuSchedulerDashboard() {
   // Inject fonts
