@@ -258,7 +258,10 @@ export default function CsuSchedulerDashboard() {
     form.append("course_roster", courseFile);
     form.append("staff_roster",  staffFile);
     try {
-      const res = await fetch("/api/upload-rosters", { method: "POST", body: form });
+      const res = await fetch("http://localhost:8000/api/upload-rosters", {
+        method: "POST",
+        body: form,
+      });
       if (!res.ok) throw new Error();
       setToast("Uploaded! Redirecting…");
       setTimeout(() => (window.location.href = "/planner"), 800);
@@ -283,10 +286,18 @@ export default function CsuSchedulerDashboard() {
       <header className="csu-body">
         <div className="csu-masthead">
           <div className="csu-container" style={{display:"flex", alignItems:"center", gap:14, padding:"12px 20px"}}>
-            <div style={{
-              width:36, height:36, borderRadius:"50%", background:"#fff",
-              color:THEME.green, display:"grid", placeItems:"center", fontWeight:800
-            }}>CSU</div>
+            <img
+              src="/images/logo.png"
+              alt="Company Logo"
+              style={{
+                width: 70,         
+                height: 70,
+                borderRadius: "60%",     
+                objectFit: "cover",     
+                background: "#fff",      
+                border: "2px solid #fff" 
+              }}
+            />
             <div style={{lineHeight:1}}>
               <div style={{fontSize:14, opacity:.9}}>Cleveland State University</div>
               <div className="csu-title" style={{fontSize:28, marginTop:2}}>Scheduler Dashboard</div>
@@ -303,6 +314,33 @@ export default function CsuSchedulerDashboard() {
       {/* ============== MAIN ============== */}
       <main className="csu-body" style={{ flex:1, display:"flex", justifyContent:"center", padding:"40px 20px" }}>
         <div style={{ width:"100%", maxWidth: 980 }}>
+          <img
+          src="/images/legend.png"
+          alt="Scheduler Legend"
+          style={{
+            display: "block",
+            margin: "20px auto",
+            width: "70%",           
+            maxWidth: "650px",
+            borderRadius: "10px",
+            boxShadow: "0 4px 10px rgba(0,0,0,0.1)"
+          }}
+        />
+        <h3 style={{
+          textAlign: "center",
+          fontFamily: "Merriweather, serif",
+          color: THEME.dark,
+          marginBottom: "24px"
+        }}>
+          Scheduler Legend
+        </h3>
+
+
+
+
+
+
+
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap: 24 }}>
             <UploadCard
               title="Course Roster"
