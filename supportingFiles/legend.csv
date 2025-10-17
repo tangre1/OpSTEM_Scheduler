@@ -1,0 +1,14 @@
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+Entries Should Be Limited To: ,,,,,,
+Course: ,Section:,Days: ,Times (Military): ,Role: ,Availability: ,Preffered Partner:
+Courses should only be the number - do not include MTH. ,Sections should be a numeric entry.,Days should be formatted as follows:,All times should be in 24 hour formatting.,Choose from the following. ,Availabilities will be indicated with a lower case x on the SPT roster sheet. ,Preffered Partner will be the first name and last name of the SPT as it appears in campusnet. 
+165,1,MWF,13:30,SPT,x,Juan Amador
+167,2,MW,15:25,Lead,,Tanner Greene 
+168,3,WF,,Lead Teach,,Princy Patel 
+181,4,MF,,,,
+181,5,,,,,
+281,50,,,,,
+286,51,,,,,
