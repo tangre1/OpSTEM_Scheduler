@@ -32,20 +32,32 @@ app.add_middleware(
 # Expected Columns
 # -----------------------------------------------------------------------------
 COURSE_COLS = [
-    "Course", "Section", "Days", "StartTime", "EndTime", "Room",
-    "Min # of SPTs Required"
+  "Course", 
+  "Section", 
+  "Days", 
+  "StartTime", 
+  "EndTime", 
+  "Room",
+  "Min # of SPTs Required"
 ]
+
 STAFF_COLS = [
-    "Name:",
-    "Partner Preference 1:", "Partner Preference 2:", "Partner Preference 3:",
-    "1st Choice", "2nd Choice",
-    "9:10AM-10:00AM", "10:15AM-11:05AM", "11:20AM-12:10PM",
-    "12:25PM-1:15PM", "1:30PM-2:20PM", "2:35PM-3:25PM",
-    "Veteran?"
+  "Name:",
+  "Partner Preference 1:",
+  "Partner Preference 2:",
+  "Partner Preference 3:",
+  "1st Choice",
+  "2nd Choice",
+  "9:10AM-11:05AM",
+  "11:20AM-1:15PM",
+  "1:30PM-2:20PM",
+  "Veteran?"
 ]
+
 TIME_SLOTS = [
-    "9:10AM-10:00AM", "10:15AM-11:05AM", "11:20AM-12:10PM",
-    "12:25PM-1:15PM", "1:30PM-2:20PM", "2:35PM-3:25PM"
+    "9:10AM-11:05AM",
+    "11:20AM-1:15PM",
+    "1:30PM-2:20PM"
 ]
 
 # -----------------------------------------------------------------------------
@@ -104,6 +116,7 @@ def _generate_schedule(course_rows: List[Dict[str, Any]], staff_rows: List[Dict[
     staff_by_name: Dict[str, Dict[str, Any]] = {}
     staff_load = Counter()
 
+    # Build staff availability and preferences
     for s in staff_rows:
         name = _normalize_name(s.get("Name:", ""))
         if not name:
@@ -118,11 +131,27 @@ def _generate_schedule(course_rows: List[Dict[str, Any]], staff_rows: List[Dict[
         s["_veteran"] = _truthy(s.get("Veteran?", ""))
         staff_by_name[name] = s
 
+    # Build course sessions
     sessions = []
     for c in course_rows:
         slot = f'{str(c.get("StartTime","")).strip()}-{str(c.get("EndTime","")).strip()}'
+
+        # Map fine-grained times to larger SPT blocks
+        block_map = {
+            "9:10AM-9:55AM": "9:10AM-11:05AM",
+            "9:10AM-10:00AM": "9:10AM-11:05AM",
+            "10:15AM-11:05AM": "9:10AM-11:05AM",
+            "11:20AM-12:05PM": "11:20AM-1:15PM",
+            "11:20AM-12:10PM": "11:20AM-1:15PM",
+            "12:25PM-1:15PM": "11:20AM-1:15PM",
+            "1:30PM-2:15PM": "1:30PM-2:20PM",
+            "2:25PM-3:30PM": "1:30PM-2:20PM",
+        }
+        slot = block_map.get(slot, slot)
+
         if slot not in TIME_SLOTS:
             continue
+
         try:
             need = int(str(c.get("Min # of SPTs Required", "1")).strip())
         except ValueError:
@@ -220,20 +249,14 @@ class ScheduleRequest(BaseModel):
     course_rows: List[Dict[str, Any]] | None = None
     staff_rows: List[Dict[str, Any]] | None = None
 
-from fastapi import Body
-
 @app.post("/api/generate-schedule")
 def api_generate_schedule(req: ScheduleRequest | None = Body(default=None)):
-    # allow empty body
     if req is None:
         req = ScheduleRequest()
-
     course_rows = req.course_rows if req.course_rows else LAST_COURSE_ROWS
     staff_rows = req.staff_rows if req.staff_rows else LAST_STAFF_ROWS
-
     if not course_rows or not staff_rows:
         raise HTTPException(status_code=400, detail="No data uploaded.")
-
     schedule = _generate_schedule(course_rows, staff_rows)
     return schedule
 

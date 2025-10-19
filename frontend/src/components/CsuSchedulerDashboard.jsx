@@ -31,6 +31,7 @@ const COURSE_COLS = [
   "Min # of SPTs Required"
 ];
 
+
 const STAFF_COLS = [
   "Name:",
   "Partner Preference 1:",
@@ -38,14 +39,12 @@ const STAFF_COLS = [
   "Partner Preference 3:",
   "1st Choice",
   "2nd Choice",
-  "9:10AM-10:00AM",
-  "10:15AM-11:05AM",
-  "11:20AM-12:10PM",
-  "12:25PM-1:15PM",
+  "9:10AM-11:05AM",
+  "11:20AM-1:15PM",
   "1:30PM-2:20PM",
-  "2:35PM-3:25PM",
   "Veteran?"
 ];
+
 
 export default function CsuSchedulerDashboard() {
   // Inject fonts
