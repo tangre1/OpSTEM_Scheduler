@@ -165,11 +165,17 @@ def _generate_schedule(course_rows: List[Dict[str, Any]], staff_rows: List[Dict[
 
     results: Dict[str, Any] = {}
     placed_per_slot = {slot: set() for slot in TIME_SLOTS}
+    placed_overall = set()  # NEW: Track all assigned SPTs globally
 
     for slot, course_row, need in sessions:
         key = f'{slot}|{course_row.get("Course","")}|{course_row.get("Section","")}'
         results[key] = {"meta": course_row, "assigned": []}
-        candidates = [s for s in staff_by_name.values() if s["_avail"].get(slot, False)]
+
+        candidates = [
+            s for s in staff_by_name.values()
+            if s["_avail"].get(slot, False)
+            and s["_name"] not in placed_overall  # ensure SPT not used before
+        ]
 
         while len(results[key]["assigned"]) < need and candidates:
             current_names = placed_per_slot[slot]
@@ -185,25 +191,31 @@ def _generate_schedule(course_rows: List[Dict[str, Any]], staff_rows: List[Dict[
             results[key]["assigned"].append({"name": cname, "veteran": bool(chosen["_veteran"])})
             staff_load[cname] += 1
             placed_per_slot[slot].add(cname)
+            placed_overall.add(cname)  # mark globally assigned
             candidates = [s for s in candidates if s["_name"] != cname]
 
+            # Partner preference handling
             if len(results[key]["assigned"]) < need:
                 for p in chosen["_prefs"]:
                     ps = staff_by_name.get(p)
-                    if not ps or ps["_name"] in placed_per_slot[slot]:
+                    if not ps or ps["_name"] in placed_per_slot[slot] or ps["_name"] in placed_overall:
                         continue
                     if ps in candidates:
                         results[key]["assigned"].append({"name": ps["_name"], "veteran": bool(ps["_veteran"])})
                         staff_load[ps["_name"]] += 1
                         placed_per_slot[slot].add(ps["_name"])
+                        placed_overall.add(ps["_name"])
                         candidates = [s for s in candidates if s["_name"] != ps["_name"]]
                         if len(results[key]["assigned"]) >= need:
                             break
 
+        # Fill remaining slots if not enough SPTs yet
         if len(results[key]["assigned"]) < need:
             remaining = [
                 s for s in staff_by_name.values()
-                if s["_avail"].get(slot, False) and s["_name"] not in placed_per_slot[slot]
+                if s["_avail"].get(slot, False)
+                and s["_name"] not in placed_per_slot[slot]
+                and s["_name"] not in placed_overall
             ]
             for s in remaining:
                 if len(results[key]["assigned"]) >= need:
@@ -211,6 +223,7 @@ def _generate_schedule(course_rows: List[Dict[str, Any]], staff_rows: List[Dict[
                 results[key]["assigned"].append({"name": s["_name"], "veteran": bool(s["_veteran"])})
                 staff_load[s["_name"]] += 1
                 placed_per_slot[slot].add(s["_name"])
+                placed_overall.add(s["_name"])
 
     return {"assignments": results, "staff_load": dict(staff_load)}
 
