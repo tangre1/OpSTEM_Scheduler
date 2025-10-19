@@ -21,8 +21,30 @@ const THEME = {
   cardShadowHover: "0 10px 28px rgba(0,0,0,0.12)"
 };
 
-const COURSE_COLS = ["Course", "Section", "Days", "StartTime", "EndTime", "Room"];
-const STAFF_COLS  = ["Name", "Email", "Role", "Availability", "PreferredPartners"];
+const COURSE_COLS = [
+  "Course", 
+  "Section", 
+  "Days", 
+  "StartTime", 
+  "EndTime", 
+  "Room",
+  "Min # of SPTs Required"
+];
+
+
+const STAFF_COLS = [
+  "Name:",
+  "Partner Preference 1:",
+  "Partner Preference 2:",
+  "Partner Preference 3:",
+  "1st Choice",
+  "2nd Choice",
+  "9:10AM-11:05AM",
+  "11:20AM-1:15PM",
+  "1:30PM-2:20PM",
+  "Veteran?"
+];
+
 
 export default function CsuSchedulerDashboard() {
   // Inject fonts
@@ -48,14 +70,30 @@ export default function CsuSchedulerDashboard() {
   const [staffRows,  setStaffRows]  = useState([]);
   const [toast,      setToast]      = useState("");
   const [error,      setError]      = useState("");
+  const [schedule, setSchedule] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
+  const TIME_SLOTS_ORDER = [
+    "9:10AM-10:00AM",
+    "10:15AM-11:05AM",
+    "11:20AM-12:10PM",
+    "12:25PM-1:15PM",
+    "1:30PM-2:20PM",
+    "2:35PM-3:25PM",
+  ];
   const progress = (courseFile ? 50 : 0) + (staffFile ? 50 : 0);
 
   async function parseCsv(file) {
     const text = await file.text();
-    const { data } = Papa.parse(text, { header: true, skipEmptyLines: true });
+    const delimiter = text.includes("\t") ? "\t" : ",";
+    const { data } = Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      delimiter
+    });
     return data;
   }
+
 
   const courseMissing = useMemo(() => {
     if (!courseRows.length) return COURSE_COLS;
@@ -140,12 +178,13 @@ export default function CsuSchedulerDashboard() {
     const card = {
       background: "#fff",
       border: `1px solid ${THEME.grayBorder}`,
-      borderRadius: 20,
-      padding: 24,
+      borderRadius: 14,
+      padding: 16, // smaller padding
       boxShadow: THEME.cardShadow,
-      willChange: "box-shadow",
-      backfaceVisibility: "hidden"
+      maxHeight: "500px", // limit height
+      overflowY: "auto",  // scroll if content overflows
     };
+
 
     const pickerBox = {
       border: `1px solid ${THEME.grayBorder}`,
@@ -251,24 +290,38 @@ export default function CsuSchedulerDashboard() {
     );
   };
 
-  const uploadRosters = async () => {
+const uploadRosters = async () => {
     if (!ready) return;
+    setError("");
     setToast("Uploading…");
+    setIsGenerating(true);
+
     const form = new FormData();
     form.append("course_roster", courseFile);
     form.append("staff_roster",  staffFile);
+
     try {
-      const res = await fetch("http://localhost:8000/api/upload-rosters", {
-        method: "POST",
-        body: form,
-      });
-      if (!res.ok) throw new Error();
-      setToast("Uploaded! Redirecting…");
-      setTimeout(() => (window.location.href = "/planner"), 800);
-    } catch {
-      setToast(""); setError("Upload failed — check files and try again.");
+      // 1) Upload files
+      const up = await fetch("http://localhost:8000/api/upload-rosters", { method: "POST", body: form });
+      if (!up.ok) throw new Error(await up.text());
+
+      // 2) Generate schedule from the uploaded CSVs (no body needed)
+      setToast("Building schedule…");
+      const gen = await fetch("http://localhost:8000/api/generate-schedule", { method: "POST" });
+      if (!gen.ok) throw new Error(await gen.text());
+
+      const data = await gen.json(); // { assignments, staff_load }
+      setSchedule(data);
+      setToast("Schedule ready!");
+      // (No redirect)
+    } catch (e) {
+      setToast("");
+      setError("Upload/Generate failed — check CSV headers and try again.");
+    } finally {
+      setIsGenerating(false);
     }
   };
+
 
   return (
     <div style={{minHeight:"100vh", display:"flex", flexDirection:"column", background:"linear-gradient(180deg, #F6FBF8 0%, #FFFFFF 70%)"}}>
@@ -370,6 +423,56 @@ export default function CsuSchedulerDashboard() {
               {error}
             </div>
           )}
+          {schedule && (
+            <div style={{
+              marginTop: 40,
+              border: `1px solid ${THEME.grayBorder}`,
+              borderRadius: 14,
+              background: "#fff",
+              boxShadow: THEME.cardShadow,
+              padding: 24
+            }}>
+              <h3 style={{
+                fontFamily: "Merriweather, serif",
+                color: THEME.dark,
+                fontSize: 20,
+                marginBottom: 16
+              }}>
+                Generated Schedule
+              </h3>
+
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                  <tr style={{ background: THEME.light, textAlign: "left" }}>
+                    <th style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>Course</th>
+                    <th style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>Section</th>
+                    <th style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>Time Slot</th>
+                    <th style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>Assigned SPTs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(schedule.assignments || {}).map(([key, val], i) => {
+                    const [slot, course, section] = key.split("|");
+                    const assigned = val.assigned.map(a =>
+                      a.veteran ? `${a.name} ⭐` : a.name
+                    ).join(", ");
+                    return (
+                      <tr key={i} style={{ background: i % 2 ? "#F9FAFB" : "white" }}>
+                        <td style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>{course}</td>
+                        <td style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>{section}</td>
+                        <td style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>{slot}</td>
+                        <td style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>{assigned || "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <p style={{ marginTop: 10, fontSize: 12, color: THEME.grayText }}>
+                ⭐ = Veteran
+              </p>
+            </div>
+          )}
         </div>
       </main>
 
@@ -410,7 +513,7 @@ export default function CsuSchedulerDashboard() {
             onMouseDown={e => ready && (e.currentTarget.style.transform = "scale(.98)")}
             onMouseUp={e => ready && (e.currentTarget.style.transform = "scale(1)")}
           >
-            Continue →
+            {isGenerating ? "Working…" : "Continue →"}
           </button>
         </div>
       </footer>
