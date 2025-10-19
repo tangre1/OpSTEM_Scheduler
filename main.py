@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from collections import Counter
-import csv, io, re, uvicorn
+import csv, io, re, uvicorn, random
 
 app = FastAPI(title="CSU Scheduler API")
 
@@ -16,13 +16,7 @@ app = FastAPI(title="CSU Scheduler API")
 # -----------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "*"
-    ],
+    allow_origins=["*", "http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,26 +26,26 @@ app.add_middleware(
 # Expected Columns
 # -----------------------------------------------------------------------------
 COURSE_COLS = [
-  "Course", 
-  "Section", 
-  "Days", 
-  "StartTime", 
-  "EndTime", 
-  "Room",
-  "Min # of SPTs Required"
+    "Course", 
+    "Section", 
+    "Days", 
+    "StartTime", 
+    "EndTime", 
+    "Room",
+    "Min # of SPTs Required"
 ]
 
 STAFF_COLS = [
-  "Name:",
-  "Partner Preference 1:",
-  "Partner Preference 2:",
-  "Partner Preference 3:",
-  "1st Choice",
-  "2nd Choice",
-  "9:10AM-11:05AM",
-  "11:20AM-1:15PM",
-  "1:30PM-2:20PM",
-  "Veteran?"
+    "Name:",
+    "Partner Preference 1:",
+    "Partner Preference 2:",
+    "Partner Preference 3:",
+    "1st Choice",
+    "2nd Choice",
+    "9:10AM-11:05AM",
+    "11:20AM-1:15PM",
+    "1:30PM-2:20PM",
+    "Veteran?"
 ]
 
 TIME_SLOTS = [
@@ -60,9 +54,6 @@ TIME_SLOTS = [
     "1:30PM-2:20PM"
 ]
 
-# -----------------------------------------------------------------------------
-# In-memory storage
-# -----------------------------------------------------------------------------
 LAST_COURSE_ROWS: List[Dict[str, Any]] = []
 LAST_STAFF_ROWS: List[Dict[str, Any]] = []
 
@@ -70,11 +61,9 @@ LAST_STAFF_ROWS: List[Dict[str, Any]] = []
 # Utility Functions
 # -----------------------------------------------------------------------------
 def _normalize_header(s: str) -> str:
-    """Lowercase, strip, remove punctuation and extra spaces."""
     return re.sub(r'[^a-z0-9]+', '', (s or '').strip().lower())
 
 def _parse_csv_upload(file: UploadFile) -> List[Dict[str, str]]:
-    """Read CSV (auto-detect tab vs comma, handle BOM)."""
     data = file.file.read()
     text = data.decode("utf-8-sig", errors="ignore")
     delimiter = "\t" if "\t" in text else ","
@@ -85,7 +74,7 @@ def _truthy(val) -> bool:
     if val is None:
         return False
     s = str(val).strip().lower()
-    return s in {"1", "y", "yes", "true", "t", "x", "✓", "available", "avail"}
+    return s in {"1","y","yes","true","t","x","✓","available","avail"}
 
 def _normalize_name(x: str) -> str:
     return (x or "").strip()
@@ -113,10 +102,10 @@ def _score_candidate(staff: Dict[str, Any], course_row: Dict[str, Any], already_
 # Scheduler Logic
 # -----------------------------------------------------------------------------
 def _generate_schedule(course_rows: List[Dict[str, Any]], staff_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
-    staff_by_name: Dict[str, Dict[str, Any]] = {}
+    staff_by_name = {}
     staff_load = Counter()
 
-    # Build staff availability and preferences
+    # --- Build staff metadata ---
     for s in staff_rows:
         name = _normalize_name(s.get("Name:", ""))
         if not name:
@@ -131,12 +120,10 @@ def _generate_schedule(course_rows: List[Dict[str, Any]], staff_rows: List[Dict[
         s["_veteran"] = _truthy(s.get("Veteran?", ""))
         staff_by_name[name] = s
 
-    # Build course sessions
+    # --- Build course sessions ---
     sessions = []
     for c in course_rows:
         slot = f'{str(c.get("StartTime","")).strip()}-{str(c.get("EndTime","")).strip()}'
-
-        # Map fine-grained times to larger SPT blocks
         block_map = {
             "9:10AM-9:55AM": "9:10AM-11:05AM",
             "9:10AM-10:00AM": "9:10AM-11:05AM",
@@ -148,82 +135,88 @@ def _generate_schedule(course_rows: List[Dict[str, Any]], staff_rows: List[Dict[
             "2:25PM-3:30PM": "1:30PM-2:20PM",
         }
         slot = block_map.get(slot, slot)
+        if slot in TIME_SLOTS:
+            sessions.append((slot, c))
 
-        if slot not in TIME_SLOTS:
-            continue
+    results = {}
+    placed_overall = set()
 
-        try:
-            need = int(str(c.get("Min # of SPTs Required", "1")).strip())
-        except ValueError:
-            need = 1
-        sessions.append((slot, c, max(1, need)))
-
-    def _available_count(slot, _):
-        return sum(1 for s in staff_by_name.values() if s["_avail"].get(slot, False))
-
-    sessions.sort(key=lambda x: (-x[2], _available_count(x[0], x[1])))
-
-    results: Dict[str, Any] = {}
-    placed_per_slot = {slot: set() for slot in TIME_SLOTS}
-    placed_overall = set()  # NEW: Track all assigned SPTs globally
-
-    for slot, course_row, need in sessions:
+    # --- STEP 1: Base assignment ---
+    for slot, course_row in sessions:
         key = f'{slot}|{course_row.get("Course","")}|{course_row.get("Section","")}'
         results[key] = {"meta": course_row, "assigned": []}
 
+        # find eligible candidates
         candidates = [
             s for s in staff_by_name.values()
-            if s["_avail"].get(slot, False)
-            and s["_name"] not in placed_overall  # ensure SPT not used before
+            if s["_avail"].get(slot, False) and s["_name"] not in placed_overall
         ]
 
-        while len(results[key]["assigned"]) < need and candidates:
-            current_names = placed_per_slot[slot]
-            scored = []
-            for s in candidates:
-                base = _score_candidate(s, course_row, current_names)
-                bonus = max(0, 4 - staff_load[s["_name"]])
-                scored.append((base + bonus, s))
+        while len(results[key]["assigned"]) < 2 and candidates:
+            current_names = {a["name"] for a in results[key]["assigned"]}
+            scored = [( _score_candidate(s, course_row, current_names), s) for s in candidates]
             scored.sort(key=lambda t: t[0], reverse=True)
-
             _, chosen = scored[0]
+
             cname = chosen["_name"]
             results[key]["assigned"].append({"name": cname, "veteran": bool(chosen["_veteran"])})
             staff_load[cname] += 1
-            placed_per_slot[slot].add(cname)
-            placed_overall.add(cname)  # mark globally assigned
+            placed_overall.add(cname)
             candidates = [s for s in candidates if s["_name"] != cname]
 
-            # Partner preference handling
-            if len(results[key]["assigned"]) < need:
-                for p in chosen["_prefs"]:
-                    ps = staff_by_name.get(p)
-                    if not ps or ps["_name"] in placed_per_slot[slot] or ps["_name"] in placed_overall:
-                        continue
-                    if ps in candidates:
-                        results[key]["assigned"].append({"name": ps["_name"], "veteran": bool(ps["_veteran"])})
-                        staff_load[ps["_name"]] += 1
-                        placed_per_slot[slot].add(ps["_name"])
-                        placed_overall.add(ps["_name"])
-                        candidates = [s for s in candidates if s["_name"] != ps["_name"]]
-                        if len(results[key]["assigned"]) >= need:
-                            break
-
-        # Fill remaining slots if not enough SPTs yet
-        if len(results[key]["assigned"]) < need:
-            remaining = [
+        # ensure at least one veteran
+        has_vet = any(a["veteran"] for a in results[key]["assigned"])
+        if not has_vet:
+            vet_candidates = [
                 s for s in staff_by_name.values()
-                if s["_avail"].get(slot, False)
-                and s["_name"] not in placed_per_slot[slot]
-                and s["_name"] not in placed_overall
+                if s["_veteran"] and s["_avail"].get(slot, False) and s["_name"] not in placed_overall
             ]
-            for s in remaining:
-                if len(results[key]["assigned"]) >= need:
-                    break
-                results[key]["assigned"].append({"name": s["_name"], "veteran": bool(s["_veteran"])})
-                staff_load[s["_name"]] += 1
-                placed_per_slot[slot].add(s["_name"])
-                placed_overall.add(s["_name"])
+            if vet_candidates:
+                v = vet_candidates[0]
+                results[key]["assigned"].append({"name": v["_name"], "veteran": True})
+                placed_overall.add(v["_name"])
+                staff_load[v["_name"]] += 1
+
+    # --- STEP 2: Fill unassigned SPTs into underfilled sessions ---
+    unassigned = [s for s in staff_by_name.values() if s["_name"] not in placed_overall]
+    for s in unassigned:
+        open_sessions = [
+            k for k, v in results.items()
+            if len(v["assigned"]) < 3
+        ]
+        if not open_sessions:
+            break
+        key = random.choice(open_sessions)
+        results[key]["assigned"].append({"name": s["_name"], "veteran": bool(s["_veteran"])})
+        placed_overall.add(s["_name"])
+        staff_load[s["_name"]] += 1
+
+    # --- STEP 3: Veteran rebalancing ---
+    veterans = [s for s in staff_by_name.values() if s["_veteran"]]
+    veteran_names = {s["_name"] for s in veterans}
+
+    for key, info in results.items():
+        assigned = info["assigned"]
+        if not any(a["veteran"] for a in assigned):
+            # find available veteran not yet assigned
+            available_vet = next(
+                (v for v in veterans if v["_name"] not in placed_overall),
+                None
+            )
+            if available_vet:
+                info["assigned"].append({"name": available_vet["_name"], "veteran": True})
+                placed_overall.add(available_vet["_name"])
+                staff_load[available_vet["_name"]] += 1
+            else:
+                # try swapping from another session that has ≥2 veterans
+                donor = next(
+                    (k2 for k2, v2 in results.items() if sum(a["veteran"] for a in v2["assigned"]) >= 2),
+                    None
+                )
+                if donor:
+                    donor_vet = next(a for a in results[donor]["assigned"] if a["veteran"])
+                    results[donor]["assigned"].remove(donor_vet)
+                    info["assigned"].append(donor_vet)
 
     return {"assignments": results, "staff_load": dict(staff_load)}
 
@@ -234,13 +227,10 @@ def _generate_schedule(course_rows: List[Dict[str, Any]], staff_rows: List[Dict[
 async def upload_rosters(course_roster: UploadFile = File(...), staff_roster: UploadFile = File(...)):
     course_rows = _parse_csv_upload(course_roster)
     staff_rows = _parse_csv_upload(staff_roster)
-
     if not course_rows or not staff_rows:
         raise HTTPException(status_code=400, detail="One or both CSV files are empty.")
 
-    def _check_headers(rows: List[Dict[str, Any]], required: List[str], label: str):
-        if not rows:
-            raise HTTPException(status_code=400, detail=f"{label} CSV is empty.")
+    def _check_headers(rows, required, label):
         got = {_normalize_header(k) for k in rows[0].keys()}
         missing = [c for c in required if _normalize_header(c) not in got]
         if missing:
@@ -250,9 +240,7 @@ async def upload_rosters(course_roster: UploadFile = File(...), staff_roster: Up
     _check_headers(staff_rows, STAFF_COLS, "Staff")
 
     global LAST_COURSE_ROWS, LAST_STAFF_ROWS
-    LAST_COURSE_ROWS = course_rows
-    LAST_STAFF_ROWS = staff_rows
-
+    LAST_COURSE_ROWS, LAST_STAFF_ROWS = course_rows, staff_rows
     return {"ok": True, "course_rows": len(course_rows), "staff_rows": len(staff_rows)}
 
 # -----------------------------------------------------------------------------
@@ -264,14 +252,12 @@ class ScheduleRequest(BaseModel):
 
 @app.post("/api/generate-schedule")
 def api_generate_schedule(req: ScheduleRequest | None = Body(default=None)):
-    if req is None:
-        req = ScheduleRequest()
-    course_rows = req.course_rows if req.course_rows else LAST_COURSE_ROWS
-    staff_rows = req.staff_rows if req.staff_rows else LAST_STAFF_ROWS
+    req = req or ScheduleRequest()
+    course_rows = req.course_rows or LAST_COURSE_ROWS
+    staff_rows = req.staff_rows or LAST_STAFF_ROWS
     if not course_rows or not staff_rows:
         raise HTTPException(status_code=400, detail="No data uploaded.")
-    schedule = _generate_schedule(course_rows, staff_rows)
-    return schedule
+    return _generate_schedule(course_rows, staff_rows)
 
 # -----------------------------------------------------------------------------
 # Misc endpoints
