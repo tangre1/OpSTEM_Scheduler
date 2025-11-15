@@ -1,0 +1,29 @@
+# macOS system files
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+.env
+venv/
+env/
+virtualEnvironment/
+
+# Node / Vite / React
+node_modules/
+dist/
+build/
+*.log
+
+# PyInstaller build folders
+*.spec
+csu-scheduler/
+
+# Editor junk
+.vscode/
+.idea/
