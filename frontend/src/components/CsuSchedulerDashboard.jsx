@@ -136,7 +136,40 @@ export default function CsuSchedulerDashboard() {
     courseMissing.length === 0 &&
     staffMissing.length === 0;
 
-  const renderPreview = (rows) => {
+  // ---------- Inline editing helpers ----------
+  const addBlankRow = (cols) => Object.fromEntries(cols.map((c) => [c, ""]));
+
+  const addCourseRow = () => {
+    setCourseRows((prev) => [...prev, addBlankRow(COURSE_COLS)]);
+  };
+  const addStaffRow = () => {
+    setStaffRows((prev) => [...prev, addBlankRow(STAFF_COLS)]);
+  };
+
+  const editCourseCell = (rowIdx, col, value) => {
+    setCourseRows((prev) => {
+      const copy = [...prev];
+      copy[rowIdx] = { ...copy[rowIdx], [col]: value };
+      return copy;
+    });
+  };
+  const editStaffCell = (rowIdx, col, value) => {
+    setStaffRows((prev) => {
+      const copy = [...prev];
+      copy[rowIdx] = { ...copy[rowIdx], [col]: value };
+      return copy;
+    });
+  };
+
+  const deleteCourseRow = (rowIdx) => {
+    setCourseRows((prev) => prev.filter((_, i) => i !== rowIdx));
+  };
+  const deleteStaffRow = (rowIdx) => {
+    setStaffRows((prev) => prev.filter((_, i) => i !== rowIdx));
+  };
+
+  // ---------- Editable Table ----------
+  function EditableTable({ rows, cols, onEdit, onDelete }) {
     if (!rows.length) {
       return (
         <p
@@ -147,25 +180,24 @@ export default function CsuSchedulerDashboard() {
             marginTop: 10
           }}
         >
-          No preview yet
+          No rows yet — add one with the + button.
         </p>
       );
     }
-    const headers = Array.from(
-      new Set(rows.slice(0, 5).flatMap((r) => Object.keys(r)))
-    );
+
     return (
       <div
         style={{
           border: `1px solid ${THEME.grayBorder}`,
           borderRadius: 12,
-          marginTop: 12
+          marginTop: 12,
+          overflowX: "auto"
         }}
       >
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
             <tr>
-              {headers.map((h) => (
+              {cols.map((h) => (
                 <th
                   key={h}
                   style={{
@@ -173,38 +205,81 @@ export default function CsuSchedulerDashboard() {
                     padding: "10px 12px",
                     borderBottom: `1px solid ${THEME.grayBorder}`,
                     background: "#F9FAFB",
-                    fontWeight: 600
+                    fontWeight: 600,
+                    whiteSpace: "nowrap"
                   }}
                 >
                   {h}
                 </th>
               ))}
+              <th
+                style={{
+                  textAlign: "left",
+                  padding: "10px 12px",
+                  borderBottom: `1px solid ${THEME.grayBorder}`,
+                  background: "#F9FAFB",
+                  fontWeight: 600,
+                  width: 80
+                }}
+              >
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, 5).map((r, i) => (
-              <tr
-                key={i}
-                style={{ background: i % 2 ? "rgba(0,0,0,0.02)" : "white" }}
-              >
-                {headers.map((h) => (
+            {rows.map((r, i) => (
+              <tr key={i} style={{ background: i % 2 ? "rgba(0,0,0,0.02)" : "white" }}>
+                {cols.map((h) => (
                   <td
                     key={h}
                     style={{
-                      padding: "10px 12px",
-                      borderBottom: `1px solid ${THEME.grayBorder}`
+                      padding: "8px 10px",
+                      borderBottom: `1px solid ${THEME.grayBorder}`,
+                      minWidth: 140
                     }}
                   >
-                    {r[h] ?? ""}
+                    <input
+                      value={r[h] ?? ""}
+                      onChange={(e) => onEdit(i, h, e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "6px 8px",
+                        border: `1px solid ${THEME.grayBorder}`,
+                        borderRadius: 8,
+                        fontSize: 13
+                      }}
+                    />
                   </td>
                 ))}
+                <td
+                  style={{
+                    padding: "8px 10px",
+                    borderBottom: `1px solid ${THEME.grayBorder}`
+                  }}
+                >
+                  <button
+                    onClick={() => onDelete(i)}
+                    title="Delete row"
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      background: "#FEE2E2",
+                      color: "#991B1B",
+                      border: `1px solid #FCA5A5`,
+                      fontSize: 12,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Delete
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     );
-  };
+  }
 
   const UploadCard = ({
     title,
@@ -213,6 +288,9 @@ export default function CsuSchedulerDashboard() {
     expect,
     onPick,
     onDropFile,
+    onAddRow,
+    onEditCell,
+    onDeleteRow,
     templateName
   }) => {
     const inputRef = useRef(null);
@@ -221,10 +299,10 @@ export default function CsuSchedulerDashboard() {
       background: "#fff",
       border: `1px solid ${THEME.grayBorder}`,
       borderRadius: 14,
-      padding: 16, // smaller padding
+      padding: 16, // tighter padding
       boxShadow: THEME.cardShadow,
-      maxHeight: "500px", // limit height
-      overflowY: "auto" // scroll if content overflows
+      maxHeight: "500px",
+      overflowY: "auto"
     };
 
     const pickerBox = {
@@ -240,12 +318,8 @@ export default function CsuSchedulerDashboard() {
     return (
       <div
         style={{ ...card, transition: "box-shadow 0.2s ease" }}
-        onMouseEnter={(e) =>
-          (e.currentTarget.style.boxShadow = THEME.cardShadowHover)
-        }
-        onMouseLeave={(e) =>
-          (e.currentTarget.style.boxShadow = THEME.cardShadow)
-        }
+        onMouseEnter={(e) => (e.currentTarget.style.boxShadow = THEME.cardShadowHover)}
+        onMouseLeave={(e) => (e.currentTarget.style.boxShadow = THEME.cardShadow)}
       >
         <div
           style={{
@@ -279,15 +353,13 @@ export default function CsuSchedulerDashboard() {
           </span>
         </div>
 
-        {/* Clickable upload area (no <label>) */}
+        {/* Clickable upload area */}
         <div
           role="button"
           tabIndex={0}
           style={pickerBox}
           onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) =>
-            (e.key === "Enter" || e.key === " ") && inputRef.current?.click()
-          }
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
           onDragEnter={(e) => e.preventDefault()}
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDropFile}
@@ -320,18 +392,12 @@ export default function CsuSchedulerDashboard() {
                   <path d="M19 20H5a2 2 0 0 1-2-2V8l4-4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2ZM5 8h14M9 3v5" />
                 </svg>
               </div>
-              <div style={{ color: "#111827", fontWeight: 600 }}>
-                Drag & drop or click to upload
-              </div>
-              <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>
-                Use the template below
-              </div>
+              <div style={{ color: "#111827", fontWeight: 600 }}>Drag & drop or click to upload</div>
+              <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>Use the template below</div>
             </>
           ) : (
             <>
-              <div style={{ color: THEME.green, fontWeight: 600 }}>
-                {file.name}
-              </div>
+              <div style={{ color: THEME.green, fontWeight: 600 }}>{file.name}</div>
               <div
                 style={{
                   marginTop: 8,
@@ -360,27 +426,42 @@ export default function CsuSchedulerDashboard() {
                     padding: "2px 8px"
                   }}
                 >
-                  Cols:{" "}
-                  <b>{rows.length ? Object.keys(rows[0] || {}).length : 0}</b>
+                  Cols: <b>{expect.length}</b>
                 </span>
               </div>
-              {renderPreview(rows)}
+
+              {/* Inline editing controls */}
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+                <button
+                  onClick={onAddRow}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 10,
+                    background: THEME.green,
+                    color: "#fff",
+                    border: "none",
+                    fontWeight: 700,
+                    cursor: "pointer"
+                  }}
+                >
+                  + Add Row
+                </button>
+              </div>
+
+              {/* Editable table */}
+              <EditableTable rows={rows} cols={expect} onEdit={onEditCell} onDelete={onDeleteRow} />
             </>
           )}
         </div>
 
         <p style={{ fontSize: 12, color: "#6B7280", marginTop: 12 }}>
           Expected columns:{" "}
-          <span style={{ fontWeight: 600, color: "#374151" }}>
-            {expect.join(", ")}
-          </span>
+          <span style={{ fontWeight: 600, color: "#374151" }}>{expect.join(", ")}</span>
         </p>
 
         <div style={{ display: "flex", justifyContent: "center" }}>
           <a
-            href={URL.createObjectURL(
-              new Blob([expect.join(",") + "\n"], { type: "text/csv" })
-            )}
+            href={URL.createObjectURL(new Blob([expect.join(",") + "\n"], { type: "text/csv" }))}
             download={templateName}
             style={{
               display: "inline-flex",
@@ -394,19 +475,11 @@ export default function CsuSchedulerDashboard() {
               background: "#FFFFFF",
               textDecoration: "none"
             }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = THEME.light)
-            }
+            onMouseEnter={(e) => (e.currentTarget.style.background = THEME.light)}
             onMouseLeave={(e) => (e.currentTarget.style.background = "#FFFFFF")}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.8 }}>
-              <path
-                d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+              <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Download Template
           </a>
@@ -422,10 +495,23 @@ export default function CsuSchedulerDashboard() {
     setIsGenerating(true);
 
     const form = new FormData();
-    form.append("course_roster", courseFile);
-    form.append("staff_roster", staffFile);
 
+    // 🔁 Serialize the *edited* rows back to CSV instead of sending the original files
     try {
+      const courseCsv = Papa.unparse(courseRows);
+      const staffCsv = Papa.unparse(staffRows);
+
+      form.append(
+        "course_roster",
+        new Blob([courseCsv], { type: "text/csv" }),
+        "course_roster.csv"
+      );
+      form.append(
+        "staff_roster",
+        new Blob([staffCsv], { type: "text/csv" }),
+        "staff_roster.csv"
+      );
+
       // 1) Upload files
       const up = await fetch("http://localhost:8000/api/upload-rosters", {
         method: "POST",
@@ -443,7 +529,6 @@ export default function CsuSchedulerDashboard() {
       const data = await gen.json(); // { assignments, staff_load }
       setSchedule(data);
       setToast("Schedule ready!");
-      // (No redirect)
     } catch (e) {
       setToast("");
       setError("Upload/Generate failed — check CSV headers and try again.");
@@ -530,10 +615,7 @@ export default function CsuSchedulerDashboard() {
       </header>
 
       {/* ============== MAIN ============== */}
-      <main
-        className="csu-body"
-        style={{ flex: 1, display: "flex", justifyContent: "center", padding: "40px 20px" }}
-      >
+      <main className="csu-body" style={{ flex: 1, display: "flex", justifyContent: "center", padding: "40px 20px" }}>
         <div style={{ width: "100%", maxWidth: 980 }}>
           <img
             src="/images/legend.png"
@@ -566,6 +648,9 @@ export default function CsuSchedulerDashboard() {
               expect={COURSE_COLS}
               onPick={(f) => handleFile(f, "course")}
               onDropFile={(e) => onDrop(e, "course")}
+              onAddRow={addCourseRow}
+              onEditCell={editCourseCell}
+              onDeleteRow={deleteCourseRow}
               templateName="course_roster_template.csv"
             />
             <UploadCard
@@ -575,6 +660,9 @@ export default function CsuSchedulerDashboard() {
               expect={STAFF_COLS}
               onPick={(f) => handleFile(f, "staff")}
               onDropFile={(e) => onDrop(e, "staff")}
+              onAddRow={addStaffRow}
+              onEditCell={editStaffCell}
+              onDeleteRow={deleteStaffRow}
               templateName="staff_roster_template.csv"
             />
           </div>
