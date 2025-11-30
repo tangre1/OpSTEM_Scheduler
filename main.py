@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from collections import Counter
+from pathlib import Path
 import csv, io, re, uvicorn, random
 
 app = FastAPI(title="CSU Scheduler API")
@@ -274,7 +275,10 @@ def health():
 # -----------------------------------------------------------------------------
 # Serve frontend
 # -----------------------------------------------------------------------------
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+BASE_DIR = Path(__file__).resolve().parent
+FRONTEND_DIR = BASE_DIR / "frontend"
+
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
