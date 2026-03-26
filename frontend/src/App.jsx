@@ -1,6 +1,8 @@
-import { useState } from "react";
+// frontend/src/App.jsx
+import React, { useState } from "react";
 import CsuSchedulerDashboard from "./components/CsuSchedulerDashboard";
 import ScheduleReview from "./components/ScheduleReview";
+import "./index.css";
 
 export default function App() {
   const [view, setView] = useState("upload");
@@ -13,7 +15,7 @@ export default function App() {
         <CsuSchedulerDashboard
           onScheduleGenerated={(result, staff) => {
             setScheduleResult(result);
-            setStaffRows(staff);
+            setStaffRows(staff || []);
             setView("review");
           }}
         />
