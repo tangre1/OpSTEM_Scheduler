@@ -275,8 +275,9 @@ def health():
 # -----------------------------------------------------------------------------
 # Serve frontend
 # -----------------------------------------------------------------------------
+
 BASE_DIR = Path(__file__).resolve().parent
-FRONTEND_DIR = BASE_DIR / "frontend"
+FRONTEND_DIR = BASE_DIR / "frontend" / "dist"
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
