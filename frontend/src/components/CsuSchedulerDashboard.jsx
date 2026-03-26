@@ -18,7 +18,7 @@ const THEME = {
   grayText: "#4B5563",
   grayBorder: "#E5E7EB",
   cardShadow: "0 6px 20px rgba(0,0,0,0.08)",
-  cardShadowHover: "0 10px 28px rgba(0,0,0,0.12)"
+  cardShadowHover: "0 10px 28px rgba(0,0,0,0.12)",
 };
 
 const COURSE_COLS = [
@@ -28,7 +28,7 @@ const COURSE_COLS = [
   "StartTime",
   "EndTime",
   "Room",
-  "Min # of SPTs Required"
+  "Min # of SPTs Required",
 ];
 
 const STAFF_COLS = [
@@ -41,24 +41,28 @@ const STAFF_COLS = [
   "9:10AM-11:05AM",
   "11:20AM-1:15PM",
   "1:30PM-2:20PM",
-  "Veteran?"
+  "Veteran?",
 ];
 
-export default function CsuSchedulerDashboard() {
+export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
   // Inject fonts
   useEffect(() => {
     const link1 = document.createElement("link");
     link1.rel = "preconnect";
     link1.href = "https://fonts.googleapis.com";
+
     const link2 = document.createElement("link");
     link2.rel = "preconnect";
     link2.href = "https://fonts.gstatic.com";
     link2.crossOrigin = "anonymous";
+
     const link3 = document.createElement("link");
     link3.href =
       "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700;900&display=swap";
     link3.rel = "stylesheet";
+
     document.head.append(link1, link2, link3);
+
     return () => {
       link1.remove();
       link2.remove();
@@ -81,8 +85,9 @@ export default function CsuSchedulerDashboard() {
     "11:20AM-12:10PM",
     "12:25PM-1:15PM",
     "1:30PM-2:20PM",
-    "2:35PM-3:25PM"
+    "2:35PM-3:25PM",
   ];
+
   const progress = (courseFile ? 50 : 0) + (staffFile ? 50 : 0);
 
   async function parseCsv(file) {
@@ -91,7 +96,7 @@ export default function CsuSchedulerDashboard() {
     const { data } = Papa.parse(text, {
       header: true,
       skipEmptyLines: true,
-      delimiter
+      delimiter,
     });
     return data;
   }
@@ -111,11 +116,14 @@ export default function CsuSchedulerDashboard() {
   const handleFile = async (file, type) => {
     setError("");
     const ext = (file.name.split(".").pop() || "").toLowerCase();
+
     if (ext !== "csv") {
       setError("Please upload a .csv file (use the provided template).");
       return;
     }
+
     const rows = await parseCsv(file);
+
     if (type === "course") {
       setCourseFile(file);
       setCourseRows(rows);
@@ -142,6 +150,7 @@ export default function CsuSchedulerDashboard() {
   const addCourseRow = () => {
     setCourseRows((prev) => [...prev, addBlankRow(COURSE_COLS)]);
   };
+
   const addStaffRow = () => {
     setStaffRows((prev) => [...prev, addBlankRow(STAFF_COLS)]);
   };
@@ -153,6 +162,7 @@ export default function CsuSchedulerDashboard() {
       return copy;
     });
   };
+
   const editStaffCell = (rowIdx, col, value) => {
     setStaffRows((prev) => {
       const copy = [...prev];
@@ -164,11 +174,11 @@ export default function CsuSchedulerDashboard() {
   const deleteCourseRow = (rowIdx) => {
     setCourseRows((prev) => prev.filter((_, i) => i !== rowIdx));
   };
+
   const deleteStaffRow = (rowIdx) => {
     setStaffRows((prev) => prev.filter((_, i) => i !== rowIdx));
   };
 
-  // ---------- Editable Table ----------
   function EditableTable({ rows, cols, onEdit, onDelete }) {
     if (!rows.length) {
       return (
@@ -177,7 +187,7 @@ export default function CsuSchedulerDashboard() {
             color: "#6B7280",
             fontSize: 12,
             textAlign: "center",
-            marginTop: 10
+            marginTop: 10,
           }}
         >
           No rows yet — add one with the + button.
@@ -191,7 +201,7 @@ export default function CsuSchedulerDashboard() {
           border: `1px solid ${THEME.grayBorder}`,
           borderRadius: 12,
           marginTop: 12,
-          overflowX: "auto"
+          overflowX: "auto",
         }}
       >
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
@@ -206,7 +216,7 @@ export default function CsuSchedulerDashboard() {
                     borderBottom: `1px solid ${THEME.grayBorder}`,
                     background: "#F9FAFB",
                     fontWeight: 600,
-                    whiteSpace: "nowrap"
+                    whiteSpace: "nowrap",
                   }}
                 >
                   {h}
@@ -219,7 +229,7 @@ export default function CsuSchedulerDashboard() {
                   borderBottom: `1px solid ${THEME.grayBorder}`,
                   background: "#F9FAFB",
                   fontWeight: 600,
-                  width: 80
+                  width: 80,
                 }}
               >
                 Actions
@@ -235,7 +245,7 @@ export default function CsuSchedulerDashboard() {
                     style={{
                       padding: "8px 10px",
                       borderBottom: `1px solid ${THEME.grayBorder}`,
-                      minWidth: 140
+                      minWidth: 140,
                     }}
                   >
                     <input
@@ -246,7 +256,7 @@ export default function CsuSchedulerDashboard() {
                         padding: "6px 8px",
                         border: `1px solid ${THEME.grayBorder}`,
                         borderRadius: 8,
-                        fontSize: 13
+                        fontSize: 13,
                       }}
                     />
                   </td>
@@ -254,7 +264,7 @@ export default function CsuSchedulerDashboard() {
                 <td
                   style={{
                     padding: "8px 10px",
-                    borderBottom: `1px solid ${THEME.grayBorder}`
+                    borderBottom: `1px solid ${THEME.grayBorder}`,
                   }}
                 >
                   <button
@@ -267,7 +277,7 @@ export default function CsuSchedulerDashboard() {
                       color: "#991B1B",
                       border: `1px solid #FCA5A5`,
                       fontSize: 12,
-                      cursor: "pointer"
+                      cursor: "pointer",
                     }}
                   >
                     Delete
@@ -291,7 +301,7 @@ export default function CsuSchedulerDashboard() {
     onAddRow,
     onEditCell,
     onDeleteRow,
-    templateName
+    templateName,
   }) => {
     const inputRef = useRef(null);
 
@@ -299,10 +309,10 @@ export default function CsuSchedulerDashboard() {
       background: "#fff",
       border: `1px solid ${THEME.grayBorder}`,
       borderRadius: 14,
-      padding: 16, // tighter padding
+      padding: 16,
       boxShadow: THEME.cardShadow,
       maxHeight: "500px",
-      overflowY: "auto"
+      overflowY: "auto",
     };
 
     const pickerBox = {
@@ -312,7 +322,7 @@ export default function CsuSchedulerDashboard() {
       textAlign: "center",
       background: "#F7FAF7",
       cursor: "pointer",
-      transition: "background .2s ease"
+      transition: "background .2s ease",
     };
 
     return (
@@ -326,7 +336,7 @@ export default function CsuSchedulerDashboard() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: 8
+            marginBottom: 8,
           }}
         >
           <h2
@@ -334,7 +344,7 @@ export default function CsuSchedulerDashboard() {
               fontFamily: "Merriweather, serif",
               fontSize: 20,
               color: THEME.dark,
-              margin: 0
+              margin: 0,
             }}
           >
             {title}
@@ -346,14 +356,13 @@ export default function CsuSchedulerDashboard() {
               border: `1px solid ${THEME.grayBorder}`,
               borderRadius: 6,
               background: "#F3F4F6",
-              color: "#374151"
+              color: "#374151",
             }}
           >
             CSV
           </span>
         </div>
 
-        {/* Clickable upload area */}
         <div
           role="button"
           tabIndex={0}
@@ -385,15 +394,19 @@ export default function CsuSchedulerDashboard() {
                   display: "grid",
                   placeItems: "center",
                   background: THEME.light,
-                  color: THEME.green
+                  color: THEME.green,
                 }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M19 20H5a2 2 0 0 1-2-2V8l4-4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2ZM5 8h14M9 3v5" />
                 </svg>
               </div>
-              <div style={{ color: "#111827", fontWeight: 600 }}>Drag & drop or click to upload</div>
-              <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>Use the template below</div>
+              <div style={{ color: "#111827", fontWeight: 600 }}>
+                Drag & drop or click to upload
+              </div>
+              <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>
+                Use the template below
+              </div>
             </>
           ) : (
             <>
@@ -405,7 +418,7 @@ export default function CsuSchedulerDashboard() {
                   gap: 8,
                   justifyContent: "center",
                   fontSize: 12,
-                  color: "#6B7280"
+                  color: "#6B7280",
                 }}
               >
                 <span
@@ -413,7 +426,7 @@ export default function CsuSchedulerDashboard() {
                     background: "#F3F4F6",
                     border: "1px solid #E5E7EB",
                     borderRadius: 6,
-                    padding: "2px 8px"
+                    padding: "2px 8px",
                   }}
                 >
                   Rows: <b>{rows.length}</b>
@@ -423,14 +436,13 @@ export default function CsuSchedulerDashboard() {
                     background: "#F3F4F6",
                     border: "1px solid #E5E7EB",
                     borderRadius: 6,
-                    padding: "2px 8px"
+                    padding: "2px 8px",
                   }}
                 >
                   Cols: <b>{expect.length}</b>
                 </span>
               </div>
 
-              {/* Inline editing controls */}
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
                 <button
                   onClick={onAddRow}
@@ -441,14 +453,13 @@ export default function CsuSchedulerDashboard() {
                     color: "#fff",
                     border: "none",
                     fontWeight: 700,
-                    cursor: "pointer"
+                    cursor: "pointer",
                   }}
                 >
                   + Add Row
                 </button>
               </div>
 
-              {/* Editable table */}
               <EditableTable rows={rows} cols={expect} onEdit={onEditCell} onDelete={onDeleteRow} />
             </>
           )}
@@ -473,13 +484,19 @@ export default function CsuSchedulerDashboard() {
               fontSize: 13,
               color: THEME.dark,
               background: "#FFFFFF",
-              textDecoration: "none"
+              textDecoration: "none",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = THEME.light)}
             onMouseLeave={(e) => (e.currentTarget.style.background = "#FFFFFF")}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.8 }}>
-              <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
             Download Template
           </a>
@@ -490,13 +507,13 @@ export default function CsuSchedulerDashboard() {
 
   const uploadRosters = async () => {
     if (!ready) return;
+
     setError("");
     setToast("Uploading…");
     setIsGenerating(true);
 
     const form = new FormData();
 
-    // 🔁 Serialize the *edited* rows back to CSV instead of sending the original files
     try {
       const courseCsv = Papa.unparse(courseRows);
       const staffCsv = Papa.unparse(staffRows);
@@ -512,21 +529,21 @@ export default function CsuSchedulerDashboard() {
         "staff_roster.csv"
       );
 
-      // 1) Upload files
-      const up = await fetch("http://localhost:8000/api/upload-rosters", {
+      const up = await fetch("/api/upload-rosters", {
         method: "POST",
-        body: form
+        body: form,
       });
       if (!up.ok) throw new Error(await up.text());
 
-      // 2) Generate schedule from the uploaded CSVs (no body needed)
       setToast("Building schedule…");
-      const gen = await fetch("http://localhost:8000/api/generate-schedule", {
-        method: "POST"
+
+      const gen = await fetch("/api/generate-schedule", {
+        method: "POST",
       });
       if (!gen.ok) throw new Error(await gen.text());
 
-      const data = await gen.json(); // { assignments, staff_load }
+      const data = await gen.json();
+
       setSchedule(data);
       setToast("Schedule ready!");
     } catch (e) {
@@ -537,10 +554,10 @@ export default function CsuSchedulerDashboard() {
     }
   };
 
-  function downloadCSV(schedule) {
+  function downloadCSV(scheduleToDownload) {
     const rows = [["Course", "Section", "Time Slot", "Assigned SPTs"]];
 
-    for (const [key, val] of Object.entries(schedule.assignments || {})) {
+    for (const [key, val] of Object.entries(scheduleToDownload.assignments || {})) {
       const [slot, course, section] = key.split("|");
       const assigned = val.assigned
         .map((a) => (a.veteran ? `${a.name} ⭐` : a.name))
@@ -561,16 +578,36 @@ export default function CsuSchedulerDashboard() {
     URL.revokeObjectURL(url);
   }
 
+  const sortedAssignments = useMemo(() => {
+    const entries = Object.entries(schedule?.assignments || {});
+    return entries.sort(([keyA], [keyB]) => {
+      const [slotA, courseA, sectionA] = keyA.split("|");
+      const [slotB, courseB, sectionB] = keyB.split("|");
+
+      const slotIndexA = TIME_SLOTS_ORDER.indexOf(slotA);
+      const slotIndexB = TIME_SLOTS_ORDER.indexOf(slotB);
+
+      if (slotIndexA !== slotIndexB) {
+        return (slotIndexA === -1 ? 999 : slotIndexA) - (slotIndexB === -1 ? 999 : slotIndexB);
+      }
+
+      if (courseA !== courseB) {
+        return courseA.localeCompare(courseB);
+      }
+
+      return sectionA.localeCompare(sectionB);
+    });
+  }, [schedule, TIME_SLOTS_ORDER]);
+
   return (
     <div
       style={{
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
-        background: "linear-gradient(180deg, #F6FBF8 0%, #FFFFFF 70%)"
+        background: "linear-gradient(180deg, #F6FBF8 0%, #FFFFFF 70%)",
       }}
     >
-      {/* ============== CSU MASTHEAD ============== */}
       <style>{`
         :root { --csu-green:${THEME.green}; --csu-dark:${THEME.dark}; }
         .csu-masthead { background: var(--csu-green); color: #fff; }
@@ -578,7 +615,11 @@ export default function CsuSchedulerDashboard() {
         .csu-container { width: 100%; max-width: 1120px; margin-inline: auto; padding-inline: 20px; }
         .csu-title { font-family: Merriweather, serif; font-weight: 900; letter-spacing: .2px; }
         .csu-body  { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
-        @media (max-width: 640px){ .csu-title{ font-size: 24px !important; } }
+        @media (max-width: 640px){ 
+          .csu-title{ font-size: 24px !important; } 
+          .upload-grid { grid-template-columns: 1fr !important; }
+          .schedule-actions { flex-direction: column; align-items: stretch !important; }
+        }
       `}</style>
 
       <header className="csu-body">
@@ -596,7 +637,7 @@ export default function CsuSchedulerDashboard() {
                 borderRadius: "60%",
                 objectFit: "cover",
                 background: "#fff",
-                border: "2px solid #fff"
+                border: "2px solid #fff",
               }}
             />
             <div style={{ lineHeight: 1 }}>
@@ -614,8 +655,10 @@ export default function CsuSchedulerDashboard() {
         </div>
       </header>
 
-      {/* ============== MAIN ============== */}
-      <main className="csu-body" style={{ flex: 1, display: "flex", justifyContent: "center", padding: "40px 20px" }}>
+      <main
+        className="csu-body"
+        style={{ flex: 1, display: "flex", justifyContent: "center", padding: "40px 20px" }}
+      >
         <div style={{ width: "100%", maxWidth: 980 }}>
           <img
             src="/images/legend.png"
@@ -626,21 +669,25 @@ export default function CsuSchedulerDashboard() {
               width: "70%",
               maxWidth: "650px",
               borderRadius: "10px",
-              boxShadow: "0 4px 10px rgba(0,0,0,0.1)"
+              boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
             }}
           />
+
           <h3
             style={{
               textAlign: "center",
               fontFamily: "Merriweather, serif",
               color: THEME.dark,
-              marginBottom: "24px"
+              marginBottom: "24px",
             }}
           >
             Scheduler Legend
           </h3>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+          <div
+            className="upload-grid"
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}
+          >
             <UploadCard
               title="Course Roster"
               file={courseFile}
@@ -676,7 +723,7 @@ export default function CsuSchedulerDashboard() {
                 color: "#92400E",
                 borderRadius: 14,
                 padding: "10px 14px",
-                fontSize: 14
+                fontSize: 14,
               }}
             >
               {error}
@@ -691,16 +738,17 @@ export default function CsuSchedulerDashboard() {
                 borderRadius: 14,
                 background: "#fff",
                 boxShadow: THEME.cardShadow,
-                padding: 24
+                padding: 24,
               }}
             >
-              {/* Title row with right-aligned button */}
               <div
+                className="schedule-actions"
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginBottom: 16
+                  gap: 12,
+                  marginBottom: 16,
                 }}
               >
                 <h3
@@ -708,63 +756,123 @@ export default function CsuSchedulerDashboard() {
                     fontFamily: "Merriweather, serif",
                     color: THEME.dark,
                     fontSize: 20,
-                    margin: 0
+                    margin: 0,
                   }}
                 >
                   Generated Schedule
                 </h3>
 
-                <button
-                  onClick={() => downloadCSV(schedule)}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: 12,
-                    background: THEME.green,
-                    color: "#fff",
-                    border: "none",
-                    fontWeight: 700,
-                    cursor: "pointer"
-                  }}
-                >
-                  Download CSV
-                </button>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => downloadCSV(schedule)}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: 12,
+                      background: THEME.green,
+                      color: "#fff",
+                      border: "none",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Download CSV
+                  </button>
+
+                  {onScheduleGenerated && (
+                    <button
+                      onClick={() => onScheduleGenerated(schedule, staffRows)}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 12,
+                        background: THEME.dark,
+                        color: "#fff",
+                        border: "none",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Review & Explain →
+                    </button>
+                  )}
+                </div>
               </div>
 
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                 <thead>
                   <tr style={{ background: THEME.light, textAlign: "left" }}>
-                    <th style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>
+                    <th
+                      style={{
+                        padding: "10px 12px",
+                        borderBottom: `1px solid ${THEME.grayBorder}`,
+                      }}
+                    >
                       Course
                     </th>
-                    <th style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>
+                    <th
+                      style={{
+                        padding: "10px 12px",
+                        borderBottom: `1px solid ${THEME.grayBorder}`,
+                      }}
+                    >
                       Section
                     </th>
-                    <th style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>
+                    <th
+                      style={{
+                        padding: "10px 12px",
+                        borderBottom: `1px solid ${THEME.grayBorder}`,
+                      }}
+                    >
                       Time Slot
                     </th>
-                    <th style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>
+                    <th
+                      style={{
+                        padding: "10px 12px",
+                        borderBottom: `1px solid ${THEME.grayBorder}`,
+                      }}
+                    >
                       Assigned SPTs
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(schedule.assignments || {}).map(([key, val], i) => {
+                  {sortedAssignments.map(([key, val], i) => {
                     const [slot, course, section] = key.split("|");
                     const assigned = val.assigned
                       .map((a) => (a.veteran ? `${a.name} ⭐` : a.name))
                       .join(", ");
+
                     return (
-                      <tr key={i} style={{ background: i % 2 ? "#F9FAFB" : "white" }}>
-                        <td style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>
+                      <tr key={key} style={{ background: i % 2 ? "#F9FAFB" : "white" }}>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            borderBottom: `1px solid ${THEME.grayBorder}`,
+                          }}
+                        >
                           {course}
                         </td>
-                        <td style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            borderBottom: `1px solid ${THEME.grayBorder}`,
+                          }}
+                        >
                           {section}
                         </td>
-                        <td style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            borderBottom: `1px solid ${THEME.grayBorder}`,
+                          }}
+                        >
                           {slot}
                         </td>
-                        <td style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.grayBorder}` }}>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            borderBottom: `1px solid ${THEME.grayBorder}`,
+                          }}
+                        >
                           {assigned || "—"}
                         </td>
                       </tr>
@@ -773,13 +881,14 @@ export default function CsuSchedulerDashboard() {
                 </tbody>
               </table>
 
-              <p style={{ marginTop: 10, fontSize: 12, color: THEME.grayText }}>⭐ = Veteran</p>
+              <p style={{ marginTop: 10, fontSize: 12, color: THEME.grayText }}>
+                ⭐ = Veteran
+              </p>
             </div>
           )}
         </div>
       </main>
 
-      {/* ============== STICKY FOOTER ============== */}
       <footer
         className="csu-body"
         style={{
@@ -787,7 +896,7 @@ export default function CsuSchedulerDashboard() {
           bottom: 0,
           background: "#ffffffcc",
           backdropFilter: "blur(6px)",
-          borderTop: `1px solid ${THEME.grayBorder}`
+          borderTop: `1px solid ${THEME.grayBorder}`,
         }}
       >
         <div
@@ -795,28 +904,36 @@ export default function CsuSchedulerDashboard() {
           style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 20px" }}
         >
           <div style={{ flex: 1 }}>
-            <div style={{ height: 8, background: "#E5E7EB", borderRadius: 999, overflow: "hidden" }}>
+            <div
+              style={{
+                height: 8,
+                background: "#E5E7EB",
+                borderRadius: 999,
+                overflow: "hidden",
+              }}
+            >
               <motion.div
                 initial={false}
                 animate={{ width: `${progress}%` }}
                 style={{
                   height: "100%",
-                  background: `linear-gradient(90deg, ${THEME.green}, ${THEME.accent})`
+                  background: `linear-gradient(90deg, ${THEME.green}, ${THEME.accent})`,
                 }}
               />
             </div>
+
             <div style={{ fontSize: 12, color: "#6B7280", marginTop: 6 }}>
               {progress < 100
                 ? "Upload both CSVs to continue."
                 : courseMissing.length || staffMissing.length
-                ? "Fix missing columns before continuing."
-                : "Ready to continue."}
+                  ? "Fix missing columns before continuing."
+                  : "Ready to continue."}
             </div>
           </div>
 
           <button
             onClick={uploadRosters}
-            disabled={!ready}
+            disabled={!ready || isGenerating}
             style={{
               padding: "10px 18px",
               border: "none",
@@ -825,7 +942,7 @@ export default function CsuSchedulerDashboard() {
               background: ready ? THEME.green : "#D1D5DB",
               color: ready ? "#fff" : "#6B7280",
               cursor: ready ? "pointer" : "not-allowed",
-              transform: "translateZ(0)"
+              transform: "translateZ(0)",
             }}
             onMouseDown={(e) => ready && (e.currentTarget.style.transform = "scale(.98)")}
             onMouseUp={(e) => ready && (e.currentTarget.style.transform = "scale(1)")}
@@ -835,7 +952,6 @@ export default function CsuSchedulerDashboard() {
         </div>
       </footer>
 
-      {/* Toast */}
       {toast && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -850,7 +966,7 @@ export default function CsuSchedulerDashboard() {
             padding: "10px 14px",
             borderRadius: 14,
             boxShadow: "0 10px 24px rgba(0,0,0,0.15)",
-            fontWeight: 600
+            fontWeight: 600,
           }}
         >
           {toast}
