@@ -78,6 +78,7 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
   const [schedule, setSchedule] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [notes, setNotes] = useState("");
+  const [aiAnalysis, setAiAnalysis] = useState(null);
 
   const TIME_SLOTS_ORDER = [
     "9:10AM-10:00AM",
@@ -553,6 +554,8 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
 
       const analysisData = await analysisRes.json();
 
+      setAiAnalysis(analysisData.analysis);
+
       console.log("🔥 AI STAFF ANALYSIS:", analysisData);
 
       // STEP 3: Generate schedule
@@ -567,6 +570,7 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
           course_rows: courseRows,
           staff_rows: staffRows,
           coordinator_notes: notes,
+          ai_analysis: analysisData.analysis,
         }),
       });
 

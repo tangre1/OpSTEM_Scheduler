@@ -123,14 +123,15 @@ def _normalize_time_block(start_time: str, end_time: str) -> str:
     }
     return block_map.get(slot, slot)
 
-
 def _score_candidate(
     staff: Dict[str, Any],
     course_row: Dict[str, Any],
     already_in_session_names: set,
+    ai_employee_map: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> int:
     score = 0
     course_name = str(course_row.get("Course", "")).strip().lower()
+    staff_name = str(staff.get("_name", "")).strip()
 
     if course_name and str(staff.get("1st Choice", "")).strip().lower() == course_name:
         score += 6
@@ -152,8 +153,39 @@ def _score_candidate(
     if _truthy(staff.get("Veteran?", "")):
         score += 2
 
-    return score
+    if ai_employee_map and staff_name in ai_employee_map:
+        ai_staff = ai_employee_map[staff_name]
 
+        best_fit_courses = [
+            str(c).strip().lower()
+            for c in ai_staff.get("best_fit_courses", [])
+            if str(c).strip()
+        ]
+        if course_name and course_name in best_fit_courses:
+            score += 3
+
+        preferred_with = {
+            _normalize_name(name)
+            for name in ai_staff.get("preferred_with", [])
+            if _normalize_name(name)
+        }
+        partner_overlap = preferred_with & already_in_session_names
+        if partner_overlap:
+            score += 4 * len(partner_overlap)
+
+        avoid_with = {
+            _normalize_name(name)
+            for name in ai_staff.get("avoid_with", [])
+            if _normalize_name(name)
+        }
+        avoid_overlap = avoid_with & already_in_session_names
+        if avoid_overlap:
+            score -= 10 * len(avoid_overlap)
+
+        if ai_staff.get("manual_review"):
+            score -= 1
+
+    return score
 
 def _json_extract(text: str) -> Dict[str, Any]:
     """
@@ -328,9 +360,17 @@ Return ONLY valid JSON with this exact shape:
 def _generate_schedule(
     course_rows: List[Dict[str, Any]],
     staff_rows: List[Dict[str, Any]],
+    ai_analysis: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     staff_by_name: Dict[str, Dict[str, Any]] = {}
     staff_load = Counter()
+
+    ai_employee_map: Dict[str, Dict[str, Any]] = {}
+    if ai_analysis and isinstance(ai_analysis.get("employees"), list):
+        for emp in ai_analysis["employees"]:
+            emp_name = _normalize_name(emp.get("name", ""))
+            if emp_name:
+                ai_employee_map[emp_name] = emp
 
     # --- Build staff metadata ---
     for s in staff_rows:
@@ -376,7 +416,10 @@ def _generate_schedule(
 
         while len(results[key]["assigned"]) < target_base and candidates:
             current_names = {a["name"] for a in results[key]["assigned"]}
-            scored = [(_score_candidate(s, course_row, current_names), s) for s in candidates]
+            scored = [
+                (_score_candidate(s, course_row, current_names, ai_employee_map), s)
+                for s in candidates
+            ]
             scored.sort(key=lambda t: t[0], reverse=True)
             _, chosen = scored[0]
 
@@ -663,6 +706,7 @@ class ScheduleRequest(BaseModel):
     course_rows: Optional[List[Dict[str, Any]]] = None
     staff_rows: Optional[List[Dict[str, Any]]] = None
     coordinator_notes: Optional[str] = None
+    ai_analysis: Optional[Dict[str, Any]] = None
 
 
 class ExplainScheduleRequest(BaseModel):
@@ -737,6 +781,7 @@ def analyze_staff(req: StaffAnalysisRequest):
 # API: Generate Schedule
 # -----------------------------------------------------------------------------
 @app.post("/api/generate-schedule")
+@app.post("/api/generate-schedule")
 def api_generate_schedule(req: Optional[ScheduleRequest] = Body(default=None)):
     req = req or ScheduleRequest()
     course_rows = req.course_rows or LAST_COURSE_ROWS
@@ -745,8 +790,7 @@ def api_generate_schedule(req: Optional[ScheduleRequest] = Body(default=None)):
     if not course_rows or not staff_rows:
         raise HTTPException(status_code=400, detail="No data uploaded.")
 
-    return _generate_schedule(course_rows, staff_rows)
-
+    return _generate_schedule(course_rows, staff_rows, req.ai_analysis)
 
 @app.post("/api/schedule-metrics")
 def schedule_metrics(req: Optional[ScheduleRequest] = Body(default=None)):
