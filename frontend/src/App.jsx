@@ -1,4 +1,3 @@
-// frontend/src/App.jsx
 import React, { useState } from "react";
 import CsuSchedulerDashboard from "./components/CsuSchedulerDashboard";
 import ScheduleReview from "./components/ScheduleReview";
