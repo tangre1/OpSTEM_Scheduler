@@ -45,6 +45,10 @@ if OpenAI and OPENAI_API_KEY and OPENAI_BASE_URL:
         base_url=OPENAI_BASE_URL,
     )
 
+    print("DEBUG OPENAI_BASE_URL:", bool(os.getenv("OPENAI_BASE_URL")))
+    print("DEBUG OPENAI_API_KEY:", bool(os.getenv("OPENAI_API_KEY")))
+    print("DEBUG OPENAI_MODEL:", os.getenv("OPENAI_MODEL"))
+
 # -----------------------------------------------------------------------------
 # Expected Columns
 # -----------------------------------------------------------------------------
