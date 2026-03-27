@@ -45,7 +45,6 @@ const STAFF_COLS = [
 ];
 
 export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
-  // Inject fonts
   useEffect(() => {
     const link1 = document.createElement("link");
     link1.rel = "preconnect";
@@ -78,6 +77,7 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
   const [error, setError] = useState("");
   const [schedule, setSchedule] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [notes, setNotes] = useState("");
 
   const TIME_SLOTS_ORDER = [
     "9:10AM-10:00AM",
@@ -144,7 +144,6 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
     courseMissing.length === 0 &&
     staffMissing.length === 0;
 
-  // ---------- Inline editing helpers ----------
   const addBlankRow = (cols) => Object.fromEntries(cols.map((c) => [c, ""]));
 
   const addCourseRow = () => {
@@ -597,7 +596,7 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
 
       return sectionA.localeCompare(sectionB);
     });
-  }, [schedule, TIME_SLOTS_ORDER]);
+  }, [schedule]);
 
   return (
     <div
@@ -714,6 +713,52 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
             />
           </div>
 
+          <div
+            style={{
+              marginTop: 24,
+              border: `1px solid ${THEME.grayBorder}`,
+              borderRadius: 14,
+              background: "#fff",
+              boxShadow: THEME.cardShadow,
+              padding: 20,
+            }}
+          >
+            <h3
+              style={{
+                marginTop: 0,
+                marginBottom: 10,
+                fontFamily: "Merriweather, serif",
+                color: THEME.dark,
+              }}
+            >
+              Coordinator Notes / Priorities
+            </h3>
+
+            <p style={{ marginTop: 0, color: THEME.grayText, fontSize: 14 }}>
+              Add scheduling priorities for AI to consider during review.
+            </p>
+
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={`Examples:
+- Prioritize veterans in morning sections
+- Keep preferred partners together when possible
+- Avoid overloading any one staff member
+- Try not to assign Tanner on Fridays`}
+              style={{
+                width: "100%",
+                minHeight: 120,
+                padding: 12,
+                borderRadius: 12,
+                border: `1px solid ${THEME.grayBorder}`,
+                resize: "vertical",
+                fontSize: 14,
+                fontFamily: "Inter, system-ui, sans-serif",
+              }}
+            />
+          </div>
+
           {error && (
             <div
               style={{
@@ -780,7 +825,7 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
 
                   {onScheduleGenerated && (
                     <button
-                      onClick={() => onScheduleGenerated(schedule, staffRows)}
+                      onClick={() => onScheduleGenerated(schedule, staffRows, notes)}
                       style={{
                         padding: "8px 14px",
                         borderRadius: 12,

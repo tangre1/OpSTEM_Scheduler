@@ -379,14 +379,15 @@ def _compute_schedule_metrics(
         "unassigned_staff": unassigned_staff,
     }
 
-
 def _build_placeholder_explanation(
     schedule_result: Dict[str, Any],
     metrics: Dict[str, Any],
+    coordinator_notes: str | None = None,
 ) -> Dict[str, Any]:
     strengths = []
     tradeoffs = []
     recommendations = []
+    priorities_review = []
 
     if metrics["coverage_rate"] == 100:
         strengths.append("All sessions met minimum staffing requirements.")
@@ -423,6 +424,28 @@ def _build_placeholder_explanation(
             "Add availability or additional staff to improve coverage in underfilled sessions."
         )
 
+    if coordinator_notes and coordinator_notes.strip():
+        priorities_review.append(
+            "Coordinator notes were included in this review and should be considered when assessing schedule quality."
+        )
+
+        note_text = coordinator_notes.lower()
+
+        if "veteran" in note_text:
+            if metrics["veteran_coverage_rate"] >= 80:
+                strengths.append("The schedule aligns well with the stated veteran coverage priority.")
+            else:
+                tradeoffs.append("The schedule only partially satisfies the stated veteran coverage priority.")
+
+        if "partner" in note_text:
+            if metrics["partner_preference_matches"] > 0:
+                strengths.append("The schedule satisfies some of the stated partner-related priorities.")
+            else:
+                tradeoffs.append("The schedule did not produce any partner preference matches despite partner-related priorities.")
+
+        if "balance" in note_text or "workload" in note_text:
+            recommendations.append("Review staff load distribution to confirm the workload is balanced across all assigned staff.")
+
     if not recommendations:
         recommendations.append(
             "This schedule is balanced overall and needs only minor manual review."
@@ -438,6 +461,7 @@ def _build_placeholder_explanation(
 
     return {
         "summary": summary,
+        "priorities_review": priorities_review,
         "strengths": strengths,
         "tradeoffs": tradeoffs,
         "recommendations": recommendations,
@@ -454,6 +478,7 @@ class ScheduleRequest(BaseModel):
 class ExplainScheduleRequest(BaseModel):
     schedule_result: Dict[str, Any]
     staff_rows: List[Dict[str, Any]] | None = None
+    coordinator_notes: str | None = None
 
 # -----------------------------------------------------------------------------
 # API: Upload Rosters
@@ -537,8 +562,11 @@ def explain_schedule(req: ExplainScheduleRequest):
         raise HTTPException(status_code=400, detail="Missing staff_rows.")
 
     metrics = _compute_schedule_metrics(req.schedule_result, staff_rows)
-    explanation = _build_placeholder_explanation(req.schedule_result, metrics)
-
+    explanation = _build_placeholder_explanation(
+        req.schedule_result,
+        metrics,
+        req.coordinator_notes,
+    )
     return {
         "metrics": metrics,
         "explanation": explanation,

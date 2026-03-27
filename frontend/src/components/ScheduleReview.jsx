@@ -8,7 +8,7 @@ const THEME = {
   grayText: "#4B5563",
 };
 
-export default function ScheduleReview({ scheduleResult, staffRows, onBack }) {
+export default function ScheduleReview({ scheduleResult, staffRows, notes, onBack }) {
   const [metrics, setMetrics] = useState(null);
   const [explanation, setExplanation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,6 +28,7 @@ export default function ScheduleReview({ scheduleResult, staffRows, onBack }) {
           body: JSON.stringify({
             schedule_result: scheduleResult,
             staff_rows: staffRows,
+            coordinator_notes: notes,
           }),
         });
 
