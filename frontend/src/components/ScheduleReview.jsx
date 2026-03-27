@@ -8,7 +8,12 @@ const THEME = {
   grayText: "#4B5563",
 };
 
-export default function ScheduleReview({ scheduleResult, staffRows, notes, onBack }) {
+export default function ScheduleReview({
+  scheduleResult,
+  staffRows,
+  notes,
+  onBack,
+}) {
   const [metrics, setMetrics] = useState(null);
   const [explanation, setExplanation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +54,7 @@ export default function ScheduleReview({ scheduleResult, staffRows, notes, onBac
     if (scheduleResult) {
       run();
     }
-  }, [scheduleResult, staffRows]);
+  }, [scheduleResult, staffRows, notes]);
 
   if (!scheduleResult) {
     return (
@@ -75,6 +80,8 @@ export default function ScheduleReview({ scheduleResult, staffRows, notes, onBac
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: 24,
+            gap: 16,
+            flexWrap: "wrap",
           }}
         >
           <div>
@@ -114,7 +121,13 @@ export default function ScheduleReview({ scheduleResult, staffRows, notes, onBac
         ) : (
           <>
             {error && (
-              <div style={{ ...panelStyle, border: "1px solid #FCD34D", background: "#FFFBEB" }}>
+              <div
+                style={{
+                  ...panelStyle,
+                  border: "1px solid #FCD34D",
+                  background: "#FFFBEB",
+                }}
+              >
                 {error}
               </div>
             )}
@@ -128,12 +141,46 @@ export default function ScheduleReview({ scheduleResult, staffRows, notes, onBac
                   marginBottom: 24,
                 }}
               >
-                <MetricCard label="Coverage Rate" value={`${metrics.coverage_rate}%`} />
-                <MetricCard label="Veteran Coverage" value={`${metrics.veteran_coverage_rate}%`} />
-                <MetricCard label="First Choice Matches" value={metrics.first_choice_matches} />
-                <MetricCard label="Second Choice Matches" value={metrics.second_choice_matches} />
-                <MetricCard label="Partner Matches" value={metrics.partner_preference_matches} />
-                <MetricCard label="Unassigned Staff" value={metrics.unassigned_staff_count} />
+                <MetricCard
+                  label="Coverage Rate"
+                  value={`${metrics.coverage_rate}%`}
+                />
+                <MetricCard
+                  label="Veteran Coverage"
+                  value={`${metrics.veteran_coverage_rate}%`}
+                />
+                <MetricCard
+                  label="First Choice Matches"
+                  value={metrics.first_choice_matches}
+                />
+                <MetricCard
+                  label="Second Choice Matches"
+                  value={metrics.second_choice_matches}
+                />
+                <MetricCard
+                  label="Partner Matches"
+                  value={metrics.partner_preference_matches}
+                />
+                <MetricCard
+                  label="Unassigned Staff"
+                  value={metrics.unassigned_staff_count}
+                />
+              </div>
+            )}
+
+            {notes && notes.trim() && (
+              <div style={panelStyle}>
+                <h2 style={sectionTitle}>Coordinator Notes</h2>
+                <p
+                  style={{
+                    color: THEME.grayText,
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-wrap",
+                    marginBottom: 0,
+                  }}
+                >
+                  {notes}
+                </p>
               </div>
             )}
 
@@ -144,43 +191,57 @@ export default function ScheduleReview({ scheduleResult, staffRows, notes, onBac
                   {explanation.summary}
                 </p>
 
+                {explanation?.priorities_review?.length > 0 && (
+                  <SectionList
+                    title="Coordinator Priorities Review"
+                    items={explanation.priorities_review}
+                  />
+                )}
+
                 <SectionList title="Strengths" items={explanation.strengths} />
                 <SectionList title="Tradeoffs" items={explanation.tradeoffs} />
-                <SectionList title="Recommendations" items={explanation.recommendations} />
+                <SectionList
+                  title="Recommendations"
+                  items={explanation.recommendations}
+                />
               </div>
             )}
 
             <div style={panelStyle}>
               <h2 style={sectionTitle}>Assignments</h2>
               <div style={{ display: "grid", gap: 16 }}>
-                {Object.entries(scheduleResult.assignments || {}).map(([key, val]) => {
-                  const [slot, course, section] = key.split("|");
+                {Object.entries(scheduleResult.assignments || {}).map(
+                  ([key, val]) => {
+                    const [slot, course, section] = key.split("|");
 
-                  return (
-                    <div
-                      key={key}
-                      style={{
-                        border: `1px solid ${THEME.grayBorder}`,
-                        borderRadius: 12,
-                        padding: 16,
-                        background: "#fff",
-                      }}
-                    >
-                      <h3 style={{ marginTop: 0, color: THEME.dark }}>
-                        {course} — Section {section}
-                      </h3>
-                      <p style={{ color: THEME.grayText, marginTop: 0 }}>{slot}</p>
+                    return (
+                      <div
+                        key={key}
+                        style={{
+                          border: `1px solid ${THEME.grayBorder}`,
+                          borderRadius: 12,
+                          padding: 16,
+                          background: "#fff",
+                        }}
+                      >
+                        <h3 style={{ marginTop: 0, color: THEME.dark }}>
+                          {course} — Section {section}
+                        </h3>
+                        <p style={{ color: THEME.grayText, marginTop: 0 }}>
+                          {slot}
+                        </p>
 
-                      <ul style={{ paddingLeft: 18, marginBottom: 0 }}>
-                        {(val.assigned || []).map((a, i) => (
-                          <li key={i} style={{ marginBottom: 6 }}>
-                            {a.name} {a.veteran ? "⭐" : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  );
-                })}
+                        <ul style={{ paddingLeft: 18, marginBottom: 0 }}>
+                          {(val.assigned || []).map((a, i) => (
+                            <li key={i} style={{ marginBottom: 6 }}>
+                              {a.name} {a.veteran ? "⭐" : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  }
+                )}
               </div>
             </div>
           </>
@@ -200,8 +261,12 @@ function MetricCard({ label, value }) {
         padding: 18,
       }}
     >
-      <div style={{ fontSize: 13, color: "#4B5563", marginBottom: 8 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 700, color: "#004C35" }}>{value}</div>
+      <div style={{ fontSize: 13, color: "#4B5563", marginBottom: 8 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 28, fontWeight: 700, color: "#004C35" }}>
+        {value}
+      </div>
     </div>
   );
 }
