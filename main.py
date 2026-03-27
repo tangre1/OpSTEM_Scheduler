@@ -35,11 +35,15 @@ app.add_middleware(
 # OpenAI Config
 # -----------------------------------------------------------------------------
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "").strip()
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o").strip()
 
 client = None
-if OpenAI and OPENAI_API_KEY:
-    client = OpenAI(api_key=OPENAI_API_KEY)
+if OpenAI and OPENAI_API_KEY and OPENAI_BASE_URL:
+    client = OpenAI(
+        api_key=OPENAI_API_KEY,
+        base_url=OPENAI_BASE_URL,
+    )
 
 # -----------------------------------------------------------------------------
 # Expected Columns
