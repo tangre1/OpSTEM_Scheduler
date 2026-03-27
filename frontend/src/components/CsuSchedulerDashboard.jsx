@@ -291,7 +291,7 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
     );
   }
 
-  const UploadCard = ({
+const UploadCard = ({
     title,
     file,
     rows,
@@ -349,6 +349,7 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
           >
             {title}
           </h2>
+
           <span
             style={{
               fontSize: 11,
@@ -368,7 +369,10 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
           type="file"
           accept=".csv"
           style={{ display: "none" }}
-          onChange={(e) => e.target.files[0] && onPick(e.target.files[0])}
+          onChange={(e) => {
+            const picked = e.target.files?.[0];
+            if (picked) onPick(picked);
+          }}
         />
 
         {!file ? (
@@ -376,10 +380,15 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
             role="button"
             tabIndex={0}
             style={pickerBox}
-            onClick={() => inputRef.current?.click()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              inputRef.current?.click();
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
+                e.stopPropagation();
                 inputRef.current?.click();
               }
             }}
@@ -391,45 +400,132 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
           >
             <div
               style={{
-                width: 44,
-                height: 44,
-                margin: "0 auto 8px",
-                borderRadius: 10,
+                width: 64,
+                height: 64,
+                margin: "0 auto 12px auto",
+                borderRadius: 18,
+                background: "rgba(0,103,71,0.10)",
                 display: "grid",
                 placeItems: "center",
-                background: THEME.light,
-                color: THEME.green,
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 20H5a2 2 0 0 1-2-2V8l4-4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2ZM5 8h14M9 3v5" />
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 16V4m0 0-4 4m4-4 4 4M4 16.5v1A2.5 2.5 0 0 0 6.5 20h11A2.5 2.5 0 0 0 20 17.5v-1"
+                  stroke={THEME.green}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </div>
-            <div style={{ color: "#111827", fontWeight: 600 }}>
-              Drag & drop or click to upload
+
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: THEME.dark,
+                marginBottom: 6,
+              }}
+            >
+              Drag & drop your CSV here
             </div>
-            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>
-              Use the template below
+
+            <div
+              style={{
+                fontSize: 13,
+                color: "#6B7280",
+                marginBottom: 14,
+              }}
+            >
+              or click to browse from Finder
+            </div>
+
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 14px",
+                borderRadius: 12,
+                background: THEME.green,
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 13,
+              }}
+            >
+              Choose File
             </div>
           </div>
         ) : (
           <>
             <div
               style={{
-                ...pickerBox,
-                cursor: "default",
+                border: `1px solid ${THEME.grayBorder}`,
+                borderRadius: 16,
+                padding: 16,
+                background: "#FCFFFC",
               }}
-              onDragEnter={(e) => e.preventDefault()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={onDropFile}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
             >
-              <div style={{ color: THEME.green, fontWeight: 600 }}>{file.name}</div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      color: THEME.dark,
+                      fontSize: 14,
+                    }}
+                  >
+                    {file.name}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#6B7280",
+                      marginTop: 4,
+                    }}
+                  >
+                    File loaded successfully
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    inputRef.current?.click();
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 10,
+                    border: `1px solid ${THEME.grayBorder}`,
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                  }}
+                >
+                  Replace File
+                </button>
+              </div>
 
               <div
                 style={{
-                  marginTop: 8,
+                  marginTop: 12,
                   display: "flex",
                   gap: 8,
+                  flexWrap: "wrap",
                   justifyContent: "center",
                   fontSize: 12,
                   color: "#6B7280",
@@ -445,6 +541,7 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
                 >
                   Rows: <b>{rows.length}</b>
                 </span>
+
                 <span
                   style={{
                     background: "#F3F4F6",
@@ -457,10 +554,21 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
                 </span>
               </div>
 
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  justifyContent: "flex-end",
+                  marginTop: 12,
+                }}
+              >
                 <button
                   type="button"
-                  onClick={onAddRow}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onAddRow();
+                  }}
                   style={{
                     padding: "6px 10px",
                     borderRadius: 10,
@@ -487,12 +595,16 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
 
         <p style={{ fontSize: 12, color: "#6B7280", marginTop: 12 }}>
           Expected columns:{" "}
-          <span style={{ fontWeight: 600, color: "#374151" }}>{expect.join(", ")}</span>
+          <span style={{ fontWeight: 600, color: "#374151" }}>
+            {expect.join(", ")}
+          </span>
         </p>
 
         <div style={{ display: "flex", justifyContent: "center" }}>
           <a
-            href={URL.createObjectURL(new Blob([expect.join(",") + "\n"], { type: "text/csv" }))}
+            href={URL.createObjectURL(
+              new Blob([expect.join(",") + "\n"], { type: "text/csv" })
+            )}
             download={templateName}
             style={{
               display: "inline-flex",
@@ -509,7 +621,13 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
             onMouseEnter={(e) => (e.currentTarget.style.background = THEME.light)}
             onMouseLeave={(e) => (e.currentTarget.style.background = "#FFFFFF")}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.8 }}>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              style={{ opacity: 0.8 }}
+            >
               <path
                 d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"
                 stroke="currentColor"
