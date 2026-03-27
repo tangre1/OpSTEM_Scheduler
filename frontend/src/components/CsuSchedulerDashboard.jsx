@@ -363,54 +363,68 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
           </span>
         </div>
 
-        <div
-          role="button"
-          tabIndex={0}
-          style={pickerBox}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
-          onDragEnter={(e) => e.preventDefault()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDropFile}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "#EEF7F1")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "#F7FAF7")}
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".csv"
-            style={{ display: "none" }}
-            onChange={(e) => e.target.files[0] && onPick(e.target.files[0])}
-          />
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv"
+          style={{ display: "none" }}
+          onChange={(e) => e.target.files[0] && onPick(e.target.files[0])}
+        />
 
-          {!file ? (
-            <>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  margin: "0 auto 8px",
-                  borderRadius: 10,
-                  display: "grid",
-                  placeItems: "center",
-                  background: THEME.light,
-                  color: THEME.green,
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 20H5a2 2 0 0 1-2-2V8l4-4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2ZM5 8h14M9 3v5" />
-                </svg>
-              </div>
-              <div style={{ color: "#111827", fontWeight: 600 }}>
-                Drag & drop or click to upload
-              </div>
-              <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>
-                Use the template below
-              </div>
-            </>
-          ) : (
-            <>
+        {!file ? (
+          <div
+            role="button"
+            tabIndex={0}
+            style={pickerBox}
+            onClick={() => inputRef.current?.click()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                inputRef.current?.click();
+              }
+            }}
+            onDragEnter={(e) => e.preventDefault()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDropFile}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#EEF7F1")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#F7FAF7")}
+          >
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                margin: "0 auto 8px",
+                borderRadius: 10,
+                display: "grid",
+                placeItems: "center",
+                background: THEME.light,
+                color: THEME.green,
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 20H5a2 2 0 0 1-2-2V8l4-4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2ZM5 8h14M9 3v5" />
+              </svg>
+            </div>
+            <div style={{ color: "#111827", fontWeight: 600 }}>
+              Drag & drop or click to upload
+            </div>
+            <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>
+              Use the template below
+            </div>
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                ...pickerBox,
+                cursor: "default",
+              }}
+              onDragEnter={(e) => e.preventDefault()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={onDropFile}
+            >
               <div style={{ color: THEME.green, fontWeight: 600 }}>{file.name}</div>
+
               <div
                 style={{
                   marginTop: 8,
@@ -445,6 +459,7 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
 
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
                 <button
+                  type="button"
                   onClick={onAddRow}
                   style={{
                     padding: "6px 10px",
@@ -460,10 +475,15 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
                 </button>
               </div>
 
-              <EditableTable rows={rows} cols={expect} onEdit={onEditCell} onDelete={onDeleteRow} />
-            </>
-          )}
-        </div>
+              <EditableTable
+                rows={rows}
+                cols={expect}
+                onEdit={onEditCell}
+                onDelete={onDeleteRow}
+              />
+            </div>
+          </>
+        )}
 
         <p style={{ fontSize: 12, color: "#6B7280", marginTop: 12 }}>
           Expected columns:{" "}
@@ -504,6 +524,7 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
       </div>
     );
   };
+
 
   const uploadRosters = async () => {
     if (!ready) return;
