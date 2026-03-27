@@ -852,6 +852,10 @@ async def submit_schedule(request: Request):
 def health():
     return {
         "status": "ok",
+        "openai_imported": OpenAI is not None,
+        "has_openai_api_key": bool(os.getenv("OPENAI_API_KEY", "").strip()),
+        "has_openai_base_url": bool(os.getenv("OPENAI_BASE_URL", "").strip()),
+        "openai_model_env": os.getenv("OPENAI_MODEL"),
         "openai_configured": bool(client),
         "model": OPENAI_MODEL if client else None,
     }
