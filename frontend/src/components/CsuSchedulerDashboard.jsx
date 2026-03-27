@@ -528,12 +528,34 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
         "staff_roster.csv"
       );
 
+      // STEP 1: Upload CSVs
       const up = await fetch("/api/upload-rosters", {
         method: "POST",
         body: form,
       });
       if (!up.ok) throw new Error(await up.text());
 
+      // STEP 2: AI STAFF ANALYSIS
+      setToast("Analyzing staff with AI…");
+
+      const analysisRes = await fetch("/api/analyze-staff", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          staff_rows: staffRows,
+          coordinator_notes: notes,
+        }),
+      });
+
+      if (!analysisRes.ok) throw new Error("AI analysis failed");
+
+      const analysisData = await analysisRes.json();
+
+      console.log("🔥 AI STAFF ANALYSIS:", analysisData);
+
+      // STEP 3: Generate schedule
       setToast("Building schedule…");
 
       const gen = await fetch("/api/generate-schedule", {
@@ -547,14 +569,16 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
           coordinator_notes: notes,
         }),
       });
-      
+
       if (!gen.ok) throw new Error(await gen.text());
 
       const data = await gen.json();
 
       setSchedule(data);
       setToast("Schedule ready!");
+
     } catch (e) {
+      console.error(e);
       setToast("");
       setError("Upload/Generate failed — check CSV headers and try again.");
     } finally {

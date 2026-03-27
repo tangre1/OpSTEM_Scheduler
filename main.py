@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from collections import Counter
 from pathlib import Path
 import csv
@@ -10,6 +10,13 @@ import io
 import re
 import uvicorn
 import random
+import json
+import os
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
 
 app = FastAPI(title="CSU Scheduler API")
 
@@ -23,6 +30,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# -----------------------------------------------------------------------------
+# OpenAI Config
+# -----------------------------------------------------------------------------
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
+
+client = None
+if OpenAI and OPENAI_API_KEY:
+    client = OpenAI(api_key=OPENAI_API_KEY)
 
 # -----------------------------------------------------------------------------
 # Expected Columns
@@ -92,6 +109,21 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _normalize_time_block(start_time: str, end_time: str) -> str:
+    slot = f"{str(start_time).strip()}-{str(end_time).strip()}"
+    block_map = {
+        "9:10AM-9:55AM": "9:10AM-11:05AM",
+        "9:10AM-10:00AM": "9:10AM-11:05AM",
+        "10:15AM-11:05AM": "9:10AM-11:05AM",
+        "11:20AM-12:05PM": "11:20AM-1:15PM",
+        "11:20AM-12:10PM": "11:20AM-1:15PM",
+        "12:25PM-1:15PM": "11:20AM-1:15PM",
+        "1:30PM-2:15PM": "1:30PM-2:20PM",
+        "2:25PM-3:30PM": "1:30PM-2:20PM",
+    }
+    return block_map.get(slot, slot)
+
+
 def _score_candidate(
     staff: Dict[str, Any],
     course_row: Dict[str, Any],
@@ -123,24 +155,180 @@ def _score_candidate(
     return score
 
 
-def _normalize_time_block(start_time: str, end_time: str) -> str:
-    slot = f"{str(start_time).strip()}-{str(end_time).strip()}"
-    block_map = {
-        "9:10AM-9:55AM": "9:10AM-11:05AM",
-        "9:10AM-10:00AM": "9:10AM-11:05AM",
-        "10:15AM-11:05AM": "9:10AM-11:05AM",
-        "11:20AM-12:05PM": "11:20AM-1:15PM",
-        "11:20AM-12:10PM": "11:20AM-1:15PM",
-        "12:25PM-1:15PM": "11:20AM-1:15PM",
-        "1:30PM-2:15PM": "1:30PM-2:20PM",
-        "2:25PM-3:30PM": "1:30PM-2:20PM",
+def _json_extract(text: str) -> Dict[str, Any]:
+    """
+    Parse JSON from a model response. Handles plain JSON and fenced JSON blocks.
+    """
+    if not text or not text.strip():
+        raise ValueError("Empty AI response.")
+
+    cleaned = text.strip()
+
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?", "", cleaned.strip(), flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"```$", "", cleaned.strip()).strip()
+
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
+        raise
+
+
+def _default_staff_analysis(
+    staff_rows: List[Dict[str, Any]],
+    coordinator_notes: str = "",
+) -> Dict[str, Any]:
+    employees = []
+
+    for row in staff_rows:
+        name = _normalize_name(row.get("Name:", ""))
+        if not name:
+            continue
+
+        preferred_with = [
+            _normalize_name(row.get("Partner Preference 1:", "")),
+            _normalize_name(row.get("Partner Preference 2:", "")),
+            _normalize_name(row.get("Partner Preference 3:", "")),
+        ]
+        preferred_with = [p for p in preferred_with if p]
+
+        best_fit_courses = []
+        first_choice = str(row.get("1st Choice", "")).strip()
+        second_choice = str(row.get("2nd Choice", "")).strip()
+
+        if first_choice:
+            best_fit_courses.append(first_choice)
+        if second_choice and second_choice not in best_fit_courses:
+            best_fit_courses.append(second_choice)
+
+        strengths = []
+        risks = []
+
+        if _truthy(row.get("Veteran?", "")):
+            strengths.append("Veteran staff member who may help stabilize session coverage.")
+
+        availability = [
+            slot for slot in TIME_SLOTS if _truthy(row.get(slot, ""))
+        ]
+        if len(availability) >= 2:
+            strengths.append("Available across multiple time blocks.")
+        elif len(availability) == 0:
+            risks.append("No clear availability marked in the uploaded roster.")
+
+        employees.append({
+            "name": name,
+            "summary": f"{name} was analyzed from uploaded staff roster data.",
+            "strengths": strengths,
+            "risks": risks,
+            "preferred_with": preferred_with,
+            "avoid_with": [],
+            "best_fit_courses": best_fit_courses,
+            "manual_review": len(availability) == 0,
+        })
+
+    global_notes = []
+    if coordinator_notes and coordinator_notes.strip():
+        global_notes.append("Coordinator notes were included in the analysis.")
+
+    return {
+        "employees": employees,
+        "global_notes": global_notes,
+        "source": "fallback",
     }
-    return block_map.get(slot, slot)
+
+
+def _analyze_staff_with_ai(
+    staff_rows: List[Dict[str, Any]],
+    coordinator_notes: str = "",
+) -> Dict[str, Any]:
+    """
+    Returns structured staff analysis JSON.
+
+    If OPENAI_API_KEY is not configured, falls back to a deterministic local summary.
+    """
+    if not client:
+        return _default_staff_analysis(staff_rows, coordinator_notes)
+
+    prompt = f"""
+You are an expert university staffing and scheduling analyst.
+
+Analyze the uploaded employee roster for scheduling use.
+
+Your job:
+- summarize each employee
+- identify likely strengths
+- identify likely risks or missing data
+- identify partner preferences from the data
+- identify any likely avoid pairings ONLY if clearly supported by coordinator notes
+- suggest best-fit courses using first and second choices
+- set manual_review to true when the employee has unclear or weak input data
+
+Use the coordinator notes carefully. Do not invent facts that are not supported.
+
+Coordinator notes:
+{coordinator_notes or "(none)"}
+
+Staff rows:
+{json.dumps(staff_rows, indent=2)}
+
+Return ONLY valid JSON with this exact shape:
+{{
+  "employees": [
+    {{
+      "name": "string",
+      "summary": "string",
+      "strengths": ["string"],
+      "risks": ["string"],
+      "preferred_with": ["string"],
+      "avoid_with": ["string"],
+      "best_fit_courses": ["string"],
+      "manual_review": true
+    }}
+  ],
+  "global_notes": ["string"]
+}}
+""".strip()
+
+    response = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        temperature=0.2,
+        messages=[
+            {
+                "role": "system",
+                "content": "Return only valid JSON. Do not include markdown or commentary."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            },
+        ],
+    )
+
+    content = response.choices[0].message.content or ""
+    parsed = _json_extract(content)
+
+    if not isinstance(parsed, dict):
+        raise ValueError("AI analysis was not a JSON object.")
+
+    if "employees" not in parsed or not isinstance(parsed.get("employees"), list):
+        raise ValueError("AI analysis missing 'employees' list.")
+
+    if "global_notes" not in parsed or not isinstance(parsed.get("global_notes"), list):
+        parsed["global_notes"] = []
+
+    parsed["source"] = "openai"
+    return parsed
 
 # -----------------------------------------------------------------------------
 # Scheduler Logic
 # -----------------------------------------------------------------------------
-def _generate_schedule(course_rows: List[Dict[str, Any]], staff_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _generate_schedule(
+    course_rows: List[Dict[str, Any]],
+    staff_rows: List[Dict[str, Any]],
+) -> Dict[str, Any]:
     staff_by_name: Dict[str, Dict[str, Any]] = {}
     staff_load = Counter()
 
@@ -379,10 +567,11 @@ def _compute_schedule_metrics(
         "unassigned_staff": unassigned_staff,
     }
 
+
 def _build_placeholder_explanation(
     schedule_result: Dict[str, Any],
     metrics: Dict[str, Any],
-    coordinator_notes: str | None = None,
+    coordinator_notes: Optional[str] = None,
 ) -> Dict[str, Any]:
     strengths = []
     tradeoffs = []
@@ -471,14 +660,20 @@ def _build_placeholder_explanation(
 # API Models
 # -----------------------------------------------------------------------------
 class ScheduleRequest(BaseModel):
-    course_rows: List[Dict[str, Any]] | None = None
-    staff_rows: List[Dict[str, Any]] | None = None
+    course_rows: Optional[List[Dict[str, Any]]] = None
+    staff_rows: Optional[List[Dict[str, Any]]] = None
+    coordinator_notes: Optional[str] = None
 
 
 class ExplainScheduleRequest(BaseModel):
     schedule_result: Dict[str, Any]
-    staff_rows: List[Dict[str, Any]] | None = None
-    coordinator_notes: str | None = None
+    staff_rows: Optional[List[Dict[str, Any]]] = None
+    coordinator_notes: Optional[str] = None
+
+
+class StaffAnalysisRequest(BaseModel):
+    staff_rows: List[Dict[str, Any]]
+    coordinator_notes: Optional[str] = None
 
 # -----------------------------------------------------------------------------
 # API: Upload Rosters
@@ -519,10 +714,30 @@ async def upload_rosters(
     }
 
 # -----------------------------------------------------------------------------
+# API: Analyze Staff
+# -----------------------------------------------------------------------------
+@app.post("/api/analyze-staff")
+def analyze_staff(req: StaffAnalysisRequest):
+    if not req.staff_rows:
+        raise HTTPException(status_code=400, detail="Missing staff_rows.")
+
+    try:
+        analysis = _analyze_staff_with_ai(
+            staff_rows=req.staff_rows,
+            coordinator_notes=req.coordinator_notes or "",
+        )
+        return {
+            "ok": True,
+            "analysis": analysis,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Staff analysis failed: {str(e)}")
+
+# -----------------------------------------------------------------------------
 # API: Generate Schedule
 # -----------------------------------------------------------------------------
 @app.post("/api/generate-schedule")
-def api_generate_schedule(req: ScheduleRequest | None = Body(default=None)):
+def api_generate_schedule(req: Optional[ScheduleRequest] = Body(default=None)):
     req = req or ScheduleRequest()
     course_rows = req.course_rows or LAST_COURSE_ROWS
     staff_rows = req.staff_rows or LAST_STAFF_ROWS
@@ -534,7 +749,7 @@ def api_generate_schedule(req: ScheduleRequest | None = Body(default=None)):
 
 
 @app.post("/api/schedule-metrics")
-def schedule_metrics(req: ScheduleRequest | None = Body(default=None)):
+def schedule_metrics(req: Optional[ScheduleRequest] = Body(default=None)):
     req = req or ScheduleRequest()
     course_rows = req.course_rows or LAST_COURSE_ROWS
     staff_rows = req.staff_rows or LAST_STAFF_ROWS
@@ -583,7 +798,11 @@ async def submit_schedule(request: Request):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "openai_configured": bool(client),
+        "model": OPENAI_MODEL if client else None,
+    }
 
 # -----------------------------------------------------------------------------
 # Serve Frontend
@@ -591,7 +810,11 @@ def health():
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR / "frontend" / "dist"
 
-app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+if FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
+# -----------------------------------------------------------------------------
+# Main
+# -----------------------------------------------------------------------------
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
