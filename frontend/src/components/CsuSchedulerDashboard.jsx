@@ -538,7 +538,16 @@ export default function CsuSchedulerDashboard({ onScheduleGenerated }) {
 
       const gen = await fetch("/api/generate-schedule", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          course_rows: courseRows,
+          staff_rows: staffRows,
+          coordinator_notes: notes,
+        }),
       });
+      
       if (!gen.ok) throw new Error(await gen.text());
 
       const data = await gen.json();
